@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "base/containers/contains.h"
-#include "brave/components/brave_rewards/core/common/random_util.h"
 #include "brave/components/brave_rewards/core/database/database.h"
 #include "brave/components/brave_rewards/core/ledger_impl.h"
 #include "brave/components/brave_rewards/core/logging/event_log_keys.h"
@@ -38,7 +37,7 @@ void ConnectExternalWallet::Run(
         base::unexpected(mojom::ConnectExternalWalletError::kUnexpected));
   }
 
-  auto oauth_info = ExchangeOAuthInfo(std::move(wallet));
+  auto oauth_info = ExchangeOAuthInfo();
   if (!oauth_info) {
     return std::move(callback).Run(
         base::unexpected(mojom::ConnectExternalWalletError::kUnexpected));
@@ -55,32 +54,14 @@ void ConnectExternalWallet::Run(
 }
 
 absl::optional<ConnectExternalWallet::OAuthInfo>
-ConnectExternalWallet::ExchangeOAuthInfo(
-    mojom::ExternalWalletPtr wallet) const {
-  DCHECK(wallet);
-  if (!wallet) {
-    return absl::nullopt;
-  }
-
+ConnectExternalWallet::ExchangeOAuthInfo() const {
   OAuthInfo oauth_info;
   // We need to generate a new OTS (and code verifier for bitFlyer) as soon as
   // external wallet connection is triggered.
   oauth_info.one_time_string =
-      std::exchange(wallet->one_time_string, util::GenerateRandomHexString());
-  oauth_info.code_verifier =
-      std::exchange(wallet->code_verifier, util::GeneratePKCECodeVerifier());
-
-  wallet = wallet::GenerateLinks(std::move(wallet));
-  if (!wallet) {
-    BLOG(0, "Failed to generate links for " << WalletType() << " wallet!");
-    return absl::nullopt;
-  }
-
-  if (!wallet::SetWallet(*ledger_, std::move(wallet))) {
-    BLOG(0, "Failed to save " << WalletType() << " wallet!");
-    return absl::nullopt;
-  }
-
+      ledger_->oauth_login_manager()->one_time_string();
+  oauth_info.code_verifier = ledger_->oauth_login_manager()->code_verifier();
+  ledger_->oauth_login_manager()->StartLoginRequest();
   return oauth_info;
 }
 

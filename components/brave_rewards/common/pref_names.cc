@@ -88,6 +88,7 @@ const char kWalletBitflyer[] = "brave.rewards.wallets.bitflyer";
 const char kWalletGemini[] = "brave.rewards.wallets.gemini";
 const char kWalletCreationEnvironment[] =
     "brave.rewards.wallet_creation_environment";
+const char kExternalWallet[] = "brave.rewards.external_wallet";
 const char kAdsWereDisabled[] = "brave.brave_ads.were_disabled";
 const char kHasAdsP3AState[] = "brave.brave_ads.has_p3a_state";
 

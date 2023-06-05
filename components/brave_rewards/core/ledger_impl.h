@@ -28,6 +28,7 @@
 #include "brave/components/brave_rewards/core/report/report.h"
 #include "brave/components/brave_rewards/core/state/state.h"
 #include "brave/components/brave_rewards/core/uphold/uphold.h"
+#include "brave/components/brave_rewards/core/wallet/oauth_login_manager.h"
 #include "brave/components/brave_rewards/core/wallet/wallet.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_associated_remote.h"
@@ -379,6 +380,10 @@ class LedgerImpl : public mojom::Ledger {
 
   wallet::Wallet* wallet() { return &wallet_; }
 
+  wallet::OAuthLoginManager* oauth_login_manager() {
+    return &oauth_login_manager_;
+  }
+
   report::Report* report() { return &report_; }
 
   state::State* state() { return &state_; }
@@ -432,6 +437,7 @@ class LedgerImpl : public mojom::Ledger {
   publisher::Publisher publisher_;
   Media media_;
   contribution::Contribution contribution_;
+  wallet::OAuthLoginManager oauth_login_manager_;
   wallet::Wallet wallet_;
   database::Database database_;
   report::Report report_;

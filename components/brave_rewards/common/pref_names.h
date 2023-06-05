@@ -77,6 +77,7 @@ extern const char kWalletUphold[];
 extern const char kWalletBitflyer[];
 extern const char kWalletGemini[];
 extern const char kWalletCreationEnvironment[];
+extern const char kExternalWallet[];
 
 // deprecated p3a prefs
 extern const char kAdsWereDisabled[];

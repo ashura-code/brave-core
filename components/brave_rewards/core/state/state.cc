@@ -15,6 +15,7 @@
 #include "brave/components/brave_rewards/core/constants.h"
 #include "brave/components/brave_rewards/core/database/database.h"
 #include "brave/components/brave_rewards/core/endpoints/get_parameters/get_parameters_utils.h"
+#include "brave/components/brave_rewards/core/global_constants.h"
 #include "brave/components/brave_rewards/core/ledger_impl.h"
 #include "brave/components/brave_rewards/core/publisher/publisher.h"
 #include "brave/components/brave_rewards/core/state/state.h"
@@ -148,6 +149,12 @@ std::string ConvertInlineTipPlatformToKey(
       return "";
     }
   }
+}
+
+bool IsValidWalletType(const std::string& wallet_type) {
+  return wallet_type == constant::kWalletBitflyer ||
+         wallet_type == constant::kWalletGemini ||
+         wallet_type == constant::kWalletUphold;
 }
 
 }  // namespace
@@ -414,6 +421,114 @@ void State::SetPromotionLastFetchStamp(const uint64_t stamp) {
 
 uint64_t State::GetPromotionLastFetchStamp() {
   return ledger_->GetState<uint64_t>(kPromotionLastFetchStamp);
+}
+
+bool State::SetExternalWallet(const mojom::ExternalWallet& wallet) {
+  DCHECK(IsValidWalletType(wallet.type));
+  DCHECK(wallet.status == mojom::WalletStatus::kConnected ||
+         wallet.token.empty());
+  // TODO(zenparsing): Eventually don't store any information if the wallet is
+  // not connected.
+  DCHECK(wallet.status != mojom::WalletStatus::kNotConnected ||
+         wallet.address.empty());
+
+  auto encrypted_token = ledger_->EncryptString(wallet.token);
+  if (!encrypted_token) {
+    BLOG(0, "Encryption failed for external wallet token");
+    return false;
+  }
+
+  std::string token_string;
+  base::Base64Encode(*encrypted_token, &token_string);
+
+  base::Value::Dict fees;
+  for (const auto& fee : wallet.fees) {
+    fees.Set(fee.first, fee.second);
+  }
+
+  base::Value::Dict dict;
+  dict.Set("provider", wallet.type);
+  dict.Set("access_token", token_string);
+  dict.Set("address", wallet.address);
+  dict.Set("user_name", wallet.user_name);
+  dict.Set("member_id", wallet.member_id);
+  dict.Set("fees", std::move(fees));
+
+  ledger_->SetState(kExternalWallet, base::Value(std::move(dict)));
+  return true;
+}
+
+mojom::ExternalWalletPtr State::GetExternalWallet() {
+  auto value = ledger_->GetState<base::Value>(kExternalWallet);
+  if (!value.is_dict()) {
+    BLOG(0, "External wallet value is not a dictionary");
+    return nullptr;
+  }
+
+  const base::Value::Dict& dict = value.GetDict();
+  auto wallet = mojom::ExternalWallet::New();
+
+  const auto* provider = dict.FindString("provider");
+  if (!provider || !IsValidWalletType(*provider)) {
+    BLOG(0, "External wallet provider is invalid");
+    return nullptr;
+  }
+
+  wallet->type = *provider;
+  wallet->status = mojom::WalletStatus::kNotConnected;
+  wallet->one_time_string = ledger_->oauth_login_manager()->one_time_string();
+  wallet->code_verifier = ledger_->oauth_login_manager()->code_verifier();
+
+  const auto* address = dict.FindString("address");
+  if (address) {
+    wallet->address = *address;
+    if (!wallet->address.empty()) {
+      wallet->status = mojom::WalletStatus::kLoggedOut;
+    }
+  }
+
+  const auto* token = dict.FindString("access_token");
+  if (token) {
+    std::string decoded;
+
+    if (!base::Base64Decode(*token, &decoded)) {
+      BLOG(0, "Base64 decoding failed for external wallet access token");
+      return nullptr;
+    }
+
+    auto decrypted = ledger_->DecryptString(decoded);
+    if (!decrypted) {
+      BLOG(0, "Decryption failed for external wallet access token");
+      return nullptr;
+    }
+
+    wallet->token = *decrypted;
+    if (!wallet->token.empty()) {
+      wallet->status = mojom::WalletStatus::kConnected;
+    }
+  }
+
+  const auto* user_name = dict.FindString("user_name");
+  if (user_name) {
+    wallet->user_name = *user_name;
+  }
+
+  const auto* member_id = dict.FindString("member_id");
+  if (member_id) {
+    wallet->member_id = *member_id;
+  }
+
+  if (const auto* fees = dict.FindDict("fees")) {
+    for (const auto [k, v] : *fees) {
+      if (!v.is_double()) {
+        continue;
+      }
+
+      wallet->fees.insert(std::make_pair(k, v.GetDouble()));
+    }
+  }
+
+  return wallet;
 }
 
 absl::optional<std::string> State::GetEncryptedString(const std::string& key) {

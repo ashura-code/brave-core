@@ -45,7 +45,7 @@ class ConnectExternalWallet {
   const raw_ref<LedgerImpl> ledger_;
 
  private:
-  absl::optional<OAuthInfo> ExchangeOAuthInfo(mojom::ExternalWalletPtr) const;
+  absl::optional<OAuthInfo> ExchangeOAuthInfo() const;
 
   base::expected<std::string, mojom::ConnectExternalWalletError> GetCode(
       const base::flat_map<std::string, std::string>& query_parameters,

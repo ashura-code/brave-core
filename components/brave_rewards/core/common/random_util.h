@@ -13,6 +13,8 @@
 namespace brave_rewards::internal {
 namespace util {
 
+// TODO(zenparsing): We can fold these into OAuthLoginManager.
+
 // Generates a random 32-byte hex string.
 std::string GenerateRandomHexString();
 

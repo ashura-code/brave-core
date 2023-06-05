@@ -16,7 +16,6 @@
 #include "base/strings/stringprintf.h"
 #include "brave/components/brave_rewards/core/bitflyer/bitflyer.h"
 #include "brave/components/brave_rewards/core/bitflyer/bitflyer_util.h"
-#include "brave/components/brave_rewards/core/common/random_util.h"
 #include "brave/components/brave_rewards/core/database/database.h"
 #include "brave/components/brave_rewards/core/gemini/gemini.h"
 #include "brave/components/brave_rewards/core/gemini/gemini_util.h"
@@ -32,21 +31,6 @@
 namespace brave_rewards::internal::wallet {
 
 namespace {
-
-std::string WalletTypeToState(const std::string& wallet_type) {
-  if (wallet_type == constant::kWalletBitflyer) {
-    return state::kWalletBitflyer;
-  } else if (wallet_type == constant::kWalletGemini) {
-    return state::kWalletGemini;
-  } else if (wallet_type == constant::kWalletUphold) {
-    return state::kWalletUphold;
-  } else if (wallet_type == "test") {
-    return "wallets." + wallet_type;
-  } else {
-    NOTREACHED() << "Unexpected wallet type " << wallet_type << '!';
-    return "";
-  }
-}
 
 void OnWalletStatusChange(LedgerImpl& ledger,
                           const std::string& wallet_type,
@@ -64,94 +48,17 @@ void OnWalletStatusChange(LedgerImpl& ledger,
 
 }  // namespace
 
-mojom::ExternalWalletPtr ExternalWalletPtrFromJSON(std::string wallet_string,
-                                                   std::string wallet_type) {
-  absl::optional<base::Value> value = base::JSONReader::Read(wallet_string);
-  if (!value || !value->is_dict()) {
-    BLOG(0, "Parsing of " + wallet_type + " wallet failed");
-    return nullptr;
-  }
-
-  const base::Value::Dict& dict = value->GetDict();
-  auto wallet = mojom::ExternalWallet::New();
-  wallet->type = wallet_type;
-
-  const auto* token = dict.FindString("token");
-  if (token) {
-    wallet->token = *token;
-  }
-
-  const auto* address = dict.FindString("address");
-  if (address) {
-    wallet->address = *address;
-  }
-
-  const auto* one_time_string = dict.FindString("one_time_string");
-  if (one_time_string) {
-    wallet->one_time_string = *one_time_string;
-  }
-
-  const auto* code_verifier = dict.FindString("code_verifier");
-  if (code_verifier) {
-    wallet->code_verifier = *code_verifier;
-  }
-
-  auto status = dict.FindInt("status");
-  if (status) {
-    wallet->status = static_cast<mojom::WalletStatus>(*status);
-  }
-
-  const auto* user_name = dict.FindString("user_name");
-  if (user_name) {
-    wallet->user_name = *user_name;
-  }
-
-  const auto* member_id = dict.FindString("member_id");
-  if (member_id) {
-    wallet->member_id = *member_id;
-  }
-
-  const auto* account_url = dict.FindString("account_url");
-  if (account_url) {
-    wallet->account_url = *account_url;
-  }
-
-  auto* login_url = dict.FindString("login_url");
-  if (login_url) {
-    wallet->login_url = *login_url;
-  }
-
-  const auto* activity_url = dict.FindString("activity_url");
-  if (activity_url) {
-    wallet->activity_url = *activity_url;
-  }
-
-  if (const auto* fees = dict.FindDict("fees")) {
-    for (const auto [k, v] : *fees) {
-      if (!v.is_double()) {
-        continue;
-      }
-
-      wallet->fees.insert(std::make_pair(k, v.GetDouble()));
-    }
-  }
-
-  return wallet;
-}
-
 mojom::ExternalWalletPtr GetWallet(LedgerImpl& ledger,
                                    const std::string& wallet_type) {
-  const auto state = WalletTypeToState(wallet_type);
-  if (state.empty()) {
-    return nullptr;
+  DCHECK(!wallet_type.empty());
+  auto wallet = ledger.state()->GetExternalWallet();
+  if (wallet) {
+    if (wallet->type != wallet_type) {
+      return nullptr;
+    }
+    wallet = GenerateLinks(std::move(wallet));
   }
-
-  auto json = ledger.state()->GetEncryptedString(state);
-  if (!json || json->empty()) {
-    return nullptr;
-  }
-
-  return ExternalWalletPtrFromJSON(*json, wallet_type);
+  return wallet;
 }
 
 mojom::ExternalWalletPtr GetWalletIf(
@@ -185,35 +92,7 @@ mojom::ExternalWalletPtr GetWalletIf(
 }
 
 bool SetWallet(LedgerImpl& ledger, mojom::ExternalWalletPtr wallet) {
-  if (!wallet || wallet->type.empty()) {
-    return false;
-  }
-
-  base::Value::Dict fees;
-  for (const auto& fee : wallet->fees) {
-    fees.Set(fee.first, fee.second);
-  }
-
-  base::Value::Dict new_wallet;
-  new_wallet.Set("token", wallet->token);
-  new_wallet.Set("address", wallet->address);
-  new_wallet.Set("status", static_cast<int>(wallet->status));
-  new_wallet.Set("one_time_string", wallet->one_time_string);
-  new_wallet.Set("code_verifier", wallet->code_verifier);
-  new_wallet.Set("user_name", wallet->user_name);
-  new_wallet.Set("member_id", wallet->member_id);
-  new_wallet.Set("account_url", wallet->account_url);
-  new_wallet.Set("login_url", wallet->login_url);
-  new_wallet.Set("activity_url", wallet->activity_url);
-  new_wallet.Set("fees", std::move(fees));
-
-  std::string json;
-  if (!base::JSONWriter::Write(std::move(new_wallet), &json)) {
-    return false;
-  }
-
-  return ledger.state()->SetEncryptedString(WalletTypeToState(wallet->type),
-                                            json);
+  return ledger.state()->SetExternalWallet(*wallet);
 }
 
 // Valid transition:
@@ -233,10 +112,6 @@ mojom::ExternalWalletPtr EnsureValidCreation(const std::string& wallet_type,
 
   auto wallet = mojom::ExternalWallet::New();
   wallet->type = wallet_type;
-
-  wallet->one_time_string = util::GenerateRandomHexString();
-  wallet->code_verifier = util::GeneratePKCECodeVerifier();
-
   wallet->status = to;
 
   return wallet;
@@ -290,9 +165,6 @@ mojom::ExternalWalletPtr EnsureValidTransition(mojom::ExternalWalletPtr wallet,
       // token.empty() && address.empty()
       wallet = mojom::ExternalWallet::New();
       wallet->type = wallet_type;
-
-      wallet->one_time_string = util::GenerateRandomHexString();
-      wallet->code_verifier = util::GeneratePKCECodeVerifier();
       break;
     case mojom::WalletStatus::kNotConnected:
       NOTREACHED()
@@ -339,6 +211,9 @@ mojom::ExternalWalletPtr TransitionWallet(
   if (!wallet) {
     return nullptr;
   }
+
+  wallet->one_time_string = ledger.oauth_login_manager()->one_time_string();
+  wallet->code_verifier = ledger.oauth_login_manager()->code_verifier();
 
   wallet = GenerateLinks(std::move(wallet));
   if (!wallet) {

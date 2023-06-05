@@ -105,6 +105,10 @@ class State {
 
   uint64_t GetPromotionLastFetchStamp();
 
+  bool SetExternalWallet(const mojom::ExternalWallet& wallet);
+
+  mojom::ExternalWalletPtr GetExternalWallet();
+
   absl::optional<std::string> GetEncryptedString(const std::string& key);
 
   bool SetEncryptedString(const std::string& key, const std::string& value);
