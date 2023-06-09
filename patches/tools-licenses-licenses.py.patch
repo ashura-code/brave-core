@@ -1,5 +1,5 @@
 diff --git a/tools/licenses/licenses.py b/tools/licenses/licenses.py
-index 2a6a4733128dfc5916163c1c91c26f27da1d2f0a..184496827a8001539ad54fb9496b438a921a59ea 100755
+index dfb1bda193c8fae8aa21ef80a567628937365b9e..2587d597b5efd7980f8f4e6fc3b5d2952c4e3fdf 100755
 --- a/tools/licenses/licenses.py
 +++ b/tools/licenses/licenses.py
 @@ -39,6 +39,7 @@ _REPOSITORY_ROOT = os.path.abspath(
@@ -10,15 +10,15 @@ index 2a6a4733128dfc5916163c1c91c26f27da1d2f0a..184496827a8001539ad54fb9496b438a
  
  # Paths from the root of the tree to directories to skip.
  PRUNE_PATHS = set([
-@@ -414,6 +415,7 @@ SPECIAL_CASES = {
-         "License File": "/third_party/selenium-atoms/LICENSE.closure",
+@@ -425,6 +426,7 @@ SPECIAL_CASES = {
+         "License File": ["/third_party/selenium-atoms/LICENSE.closure"],
      },
  }
 +(PRUNE_DIRS, ADDITIONAL_PATHS) = AddBraveCredits(_REPOSITORY_ROOT, PRUNE_PATHS, SPECIAL_CASES, PRUNE_DIRS, ADDITIONAL_PATHS)
  
- # Soon-to-be-deprecated special value for 'License File' field used to indicate
- # that the library is not shipped so the license file should not be used in
-@@ -643,7 +645,8 @@ def FindThirdPartyDirs(prune_paths, root, extra_third_party_dirs=None):
+ # The delimiter used to separate license files specified in the 'License File'
+ # field.
+@@ -695,7 +697,8 @@ def FindThirdPartyDirs(prune_paths, root, extra_third_party_dirs=None):
        if skip in dirs:
          dirs.remove(skip)
  
@@ -28,7 +28,7 @@ index 2a6a4733128dfc5916163c1c91c26f27da1d2f0a..184496827a8001539ad54fb9496b438a
        # Add all subdirectories that are not marked for skipping.
        for dir in dirs:
          dirpath = os.path.join(path, dir)
-@@ -870,7 +873,8 @@ def GenerateCredits(file_template_file,
+@@ -927,7 +930,8 @@ def GenerateCredits(file_template_file,
        metadata = ParseDir(path,
                            _REPOSITORY_ROOT,
                            enable_warnings=enable_warnings)

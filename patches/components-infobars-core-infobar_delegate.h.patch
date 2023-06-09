@@ -1,12 +1,12 @@
 diff --git a/components/infobars/core/infobar_delegate.h b/components/infobars/core/infobar_delegate.h
-index b73ffcb9031c88906841fa30925623d101c23964..10795a2f2b4c0d9f2e31293a6d120cdbfba06334 100644
+index 61e6926ed2b104adc7cb209c3eb88f728cc15bbf..dcd35803489e2f43a0b3296bc9c5c183f4c3aee1 100644
 --- a/components/infobars/core/infobar_delegate.h
 +++ b/components/infobars/core/infobar_delegate.h
-@@ -185,6 +185,7 @@ class InfoBarDelegate {
-     TAILORED_SECURITY_SERVICE_INFOBAR_DELEGATE = 111,
-     CHROME_FOR_TESTING_INFOBAR_DELEGATE = 112,
+@@ -187,6 +187,7 @@ class InfoBarDelegate {
      EXTENSIONS_WEB_AUTH_FLOW_INFOBAR_DELEGATE = 113,
-+    BRAVE_INFOBAR_DELEGATE_IDENTIFIERS
+     TAB_PICKUP_INFOBAR_DELEGATE = 114,
+     LOCAL_TEST_POLICIES_APPLIED_INFOBAR = 115
++    ,BRAVE_INFOBAR_DELEGATE_IDENTIFIERS
    };
  
    // Describes navigation events, used to decide whether infobars should be
