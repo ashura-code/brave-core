@@ -39,7 +39,6 @@ export function Card () {
             vbatDeadline={Date.parse('2023-01-01T00:00:00-05:00')}
             isUnsupportedRegion={false}
             declaredCountry='US'
-            adsEnabled={true}
             adsSupported={true}
             needsBrowserUpgradeToServeAds={false}
             rewardsBalance={optional(91.5812)}
@@ -71,7 +70,6 @@ export function Card () {
             publishersVisited={4}
             canConnectAccount={true}
             onEnableRewards={actionLogger('onEnableRewards')}
-            onEnableAds={actionLogger('onEnableAds')}
             onSelectCountry={actionLogger('onSelectCountry')}
             onClaimGrant={actionLogger('onClaimGrant')}
           />

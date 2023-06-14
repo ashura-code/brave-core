@@ -123,7 +123,7 @@ function createHost (): Host {
     availableCountries: ['US'],
     defaultCountry: 'US',
     declaredCountry: 'US',
-    userType: 'connected',
+    userType: 'unconnected',
     publishersVisitedCount: 4
   })
 
@@ -262,7 +262,7 @@ function createHost (): Host {
 export function MainPanel () {
   const [host] = React.useState(() => createHost())
   return (
-    <div className='brave-theme-dark'>
+    <div>
       <LocaleContext.Provider value={locale}>
         <App host={host} />
       </LocaleContext.Provider>

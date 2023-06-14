@@ -24,7 +24,6 @@ interface Props {
   disabled: boolean
   rewardsEnabled: boolean
   adsEnabled: boolean
-  canSupportAds: boolean
   isExternalWalletConnected: boolean
 }
 
@@ -167,36 +166,26 @@ function getInfoTooltipText (checked: boolean, rewardsEnabled: boolean) {
   return getLocale('sponsoredImageOnDescription')
 }
 
-function getDescriptionText (rewardsEnabled: boolean,
-  isExternalWalletConnected: boolean) {
+function getDescriptionText (rewardsEnabled: boolean) {
   if (!rewardsEnabled) {
     return getLocale('sponsoredImageRewardsOffDescription')
   }
 
-  if (!isExternalWalletConnected) {
-    return getLocale('sponsoredImageOnRewardsOnNoCustodianDescription')
-  }
-
-  return getLocale('sponsoredImageOnAdsOff')
+  return getLocale('sponsoredImageOnRewardsOnNoCustodianDescription')
 }
 
-function getButtonText (rewardsEnabled: boolean,
-  isExternalWalletConnected: boolean) {
+function getButtonText (rewardsEnabled: boolean) {
   if (!rewardsEnabled) {
     return getLocale('sponsoredImageEnableRewards')
   }
 
-  if (!isExternalWalletConnected) {
-    return getLocale('braveRewardsTitle')
-  }
-
-  return getLocale('rewardsEnableBraveAds')
+  return getLocale('braveRewardsTitle')
 }
 
 export default function SponsoredImageToggle (
   {
     onChange, onEnableRewards, checked, disabled, rewardsEnabled, adsEnabled,
-    canSupportAds, isExternalWalletConnected
+    isExternalWalletConnected
   }: Props) {
   // Info icon is shown when:
   // 1. SI toggle is off
@@ -208,14 +197,10 @@ export default function SponsoredImageToggle (
   // Description is shown when SI toggle is on and:
   // 1. Rewards is not enabled (to show the button to enable Rewards)
   // 2. Rewards custodian is not connected (to show the button to go to Rewards)
-  // 3. Ads is not enabled (to show the button to enable Ads)
   const showDescription =
     !disabled &&
     checked &&
-    (!rewardsEnabled ||
-      !isExternalWalletConnected ||
-      (!adsEnabled && canSupportAds)
-    )
+    (!rewardsEnabled || !isExternalWalletConnected)
 
   return (
     <div>
@@ -250,11 +235,11 @@ export default function SponsoredImageToggle (
               {getLocale('sponsoredImageNotEarningTitle')}
             </DescriptionTitle>
             <DescriptionBody>
-              {getDescriptionText(rewardsEnabled, isExternalWalletConnected)}
+              {getDescriptionText(rewardsEnabled)}
             </DescriptionBody>
           </DescriptionRow>
           <EnableRewardsButton onClick={onEnableRewards} title=''>
-            {getButtonText(rewardsEnabled, isExternalWalletConnected)}
+            {getButtonText(rewardsEnabled)}
           </EnableRewardsButton>
         </Container>
       }
