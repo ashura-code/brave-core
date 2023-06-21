@@ -551,8 +551,9 @@ Config.prototype.buildArgs = function () {
     delete args.enable_nacl
     delete args.enable_hangout_services_extension
 
-    // As of now we have another rust libs used that conflict with Chromium's libs.
-    // We will need to remove this change once we switch to Chromium's rust libs.
+    // As of now we have another rust libs used that conflict with Chromium's
+    // libs. We will need to remove this change once we switch to Chromium's
+    // rust libs.
     args.enable_rust = false
   }
 
