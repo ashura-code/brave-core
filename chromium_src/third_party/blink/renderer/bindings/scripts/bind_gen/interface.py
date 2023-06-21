@@ -3,9 +3,30 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import os.path
 import re
+import sys
 
 import override_utils
+
+
+def parent(path, level=0):
+    parent_path = os.path.dirname(path)
+    if level == 0:
+        return parent_path
+    return parent(parent_path, level - 1)
+
+
+SRC_SOURCE_ROOT = os.path.abspath(parent(__file__, 6))
+sys.path.insert(
+    1,
+    os.path.join(SRC_SOURCE_ROOT,
+                 'third_party/blink/renderer/bindings/scripts/'))
+
+from bind_gen.code_node import SymbolNode, TextNode  # pylint: disable=import-error,wrong-import-position
+from bind_gen.codegen_accumulator import CodeGenAccumulator  # pylint: disable=import-error,wrong-import-position
+from bind_gen.codegen_context import CodeGenContext  # pylint: disable=import-error,wrong-import-position
+from bind_gen.codegen_format import format_template as _format  # pylint: disable=import-error,wrong-import-position
 
 # Get gn arg to enable WebAPI probes.
 _IS_PG_WEBAPI_PROBES_ENABLED = override_utils.get_gn_arg(
@@ -156,7 +177,8 @@ def _bind_page_graph_local_vars(code_node, cg_context):
         event_name = "{}.{}".format(event_name, "get")
     elif cg_context.attribute_set:
         event_name = "{}.{}".format(event_name, "set")
-    elif cg_context.constructor_group and not cg_context.is_legacy_factory_function:
+    elif (cg_context.constructor_group
+          and not cg_context.is_legacy_factory_function):
         event_name = "{}.{}".format(cg_context.class_like.identifier,
                                     "constructor")
 
