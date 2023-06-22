@@ -41,7 +41,7 @@ class HTTPSEverywhereServiceTest : public ExtensionBrowserTest {
  public:
   HTTPSEverywhereServiceTest() = default;
 
-  void SetUpCommon () {
+  void SetUpCommon() {
     InitEmbeddedTestServer();
     InitService();
     ExtensionBrowserTest::SetUp();
