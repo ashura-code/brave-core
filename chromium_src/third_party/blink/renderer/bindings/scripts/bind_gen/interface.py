@@ -9,19 +9,10 @@ import sys
 
 import override_utils
 
-
-def parent(path, level=0):
-    parent_path = os.path.dirname(path)
-    if level == 0:
-        return parent_path
-    return parent(parent_path, level - 1)
-
-
-SRC_SOURCE_ROOT = os.path.abspath(parent(__file__, 6))
-sys.path.insert(
-    1,
-    os.path.join(SRC_SOURCE_ROOT,
-                 'third_party/blink/renderer/bindings/scripts/'))
+# We patch the upstream script to inline this file, so the path reported by
+# __file__ will be the path of the upstream script.
+SCRIPTS_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(1, SCRIPTS_DIR)
 
 from bind_gen.code_node import SymbolNode, TextNode  # pylint: disable=import-error,wrong-import-position
 from bind_gen.codegen_accumulator import CodeGenAccumulator  # pylint: disable=import-error,wrong-import-position
