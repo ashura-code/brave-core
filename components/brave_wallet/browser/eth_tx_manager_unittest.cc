@@ -11,10 +11,10 @@
 #include <utility>
 #include <vector>
 
+#include "base/files/scoped_temp_dir.h"
 #include "base/functional/callback_helpers.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
-#include "base/test/task_environment.h"
 #include "base/test/values_test_util.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_constants.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_prefs.h"
@@ -34,6 +34,7 @@
 #include "brave/components/brave_wallet/common/features.h"
 #include "brave/components/brave_wallet/common/hex_utils.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
+#include "content/public/test/browser_task_environment.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
@@ -256,9 +257,10 @@ class EthTxManagerUnitTest : public testing::Test {
         shared_url_loader_factory_, &profile_prefs_);
     keyring_service_ = std::make_unique<KeyringService>(
         json_rpc_service_.get(), &profile_prefs_, &local_state_);
-    tx_service_ =
-        std::make_unique<TxService>(json_rpc_service_.get(), nullptr,
-                                    keyring_service_.get(), &profile_prefs_);
+    ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
+    tx_service_ = std::make_unique<TxService>(json_rpc_service_.get(), nullptr,
+                                              keyring_service_.get(),
+                                              GetPrefs(), temp_dir_.GetPath());
 
     keyring_service_->CreateWallet("testing123", base::DoNothing());
     base::RunLoop().RunUntilIdle();
@@ -469,7 +471,8 @@ class EthTxManagerUnitTest : public testing::Test {
 
  protected:
   base::test::ScopedFeatureList feature_list_;
-  base::test::TaskEnvironment task_environment_;
+  content::BrowserTaskEnvironment task_environment_;
+  base::ScopedTempDir temp_dir_;
   sync_preferences::TestingPrefServiceSyncable profile_prefs_;
   sync_preferences::TestingPrefServiceSyncable local_state_;
   network::TestURLLoaderFactory url_loader_factory_;
@@ -2493,14 +2496,14 @@ TEST_F(EthTxManagerUnitTest, Reset) {
   auto tx = EthTransaction::FromTxData(tx_data, false);
   meta.set_tx(std::make_unique<EthTransaction>(*tx));
   eth_tx_manager()->tx_state_manager_->AddOrUpdateTx(meta);
-  EXPECT_TRUE(GetPrefs()->HasPrefPath(kBraveWalletTransactions));
+  EXPECT_EQ(eth_tx_manager()->tx_state_manager_->txs_.size(), 1u);
 
   tx_service_->Reset();
 
   EXPECT_TRUE(eth_tx_manager()->pending_chain_ids_.empty());
   EXPECT_FALSE(
       eth_tx_manager()->block_tracker_->IsRunning(mojom::kLocalhostChainId));
-  EXPECT_FALSE(GetPrefs()->HasPrefPath(kBraveWalletTransactions));
+  EXPECT_TRUE(eth_tx_manager()->tx_state_manager_->txs_.empty());
 }
 
 }  //  namespace brave_wallet

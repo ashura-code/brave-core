@@ -32,8 +32,9 @@ namespace brave_wallet {
 SolanaTxManager::SolanaTxManager(TxService* tx_service,
                                  JsonRpcService* json_rpc_service,
                                  KeyringService* keyring_service,
-                                 PrefService* prefs)
-    : TxManager(std::make_unique<SolanaTxStateManager>(prefs),
+                                 PrefService* prefs,
+                                 value_store::ValueStoreFrontend* store)
+    : TxManager(std::make_unique<SolanaTxStateManager>(prefs, store),
                 std::make_unique<SolanaBlockTracker>(json_rpc_service),
                 tx_service,
                 json_rpc_service,

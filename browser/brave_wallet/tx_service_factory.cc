@@ -151,7 +151,7 @@ KeyedService* TxServiceFactory::BuildServiceInstanceFor(
       new TxService(JsonRpcServiceFactory::GetServiceForContext(context),
                     BitcoinWalletServiceFactory::GetServiceForContext(context),
                     KeyringServiceFactory::GetServiceForContext(context),
-                    user_prefs::UserPrefs::Get(context));
+                    user_prefs::UserPrefs::Get(context), context->GetPath());
 #if !BUILDFLAG(IS_ANDROID)
   RegisterWalletNotificationService(context, tx_service);
 #endif

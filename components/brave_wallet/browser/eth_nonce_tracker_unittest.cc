@@ -9,6 +9,7 @@
 #include <string>
 #include <utility>
 
+#include "base/files/scoped_temp_dir.h"
 #include "base/test/bind.h"
 #include "base/test/task_environment.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_constants.h"
@@ -23,6 +24,7 @@
 #include "brave/components/brave_wallet/common/brave_wallet_types.h"
 #include "brave/components/brave_wallet/common/eth_address.h"
 #include "brave/components/brave_wallet/common/hex_utils.h"
+#include "brave/components/brave_wallet/common/test_utils.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "content/public/test/browser_task_environment.h"
 #include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
@@ -104,7 +106,12 @@ class EthNonceTrackerUnitTest : public testing::Test {
 TEST_F(EthNonceTrackerUnitTest, GetNonce) {
   JsonRpcService service(shared_url_loader_factory(), GetPrefs());
 
-  EthTxStateManager tx_state_manager(GetPrefs());
+  base::ScopedTempDir temp_dir;
+  scoped_refptr<value_store::TestValueStoreFactory> factory =
+      GetTestValueStoreFactory(temp_dir);
+  std::unique_ptr<value_store::ValueStoreFrontend> storage =
+      GetValueStoreFrontendForTest(factory);
+  EthTxStateManager tx_state_manager(GetPrefs(), storage.get());
   EthNonceTracker nonce_tracker(&tx_state_manager, &service);
 
   SetTransactionCount(2);

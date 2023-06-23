@@ -9,11 +9,11 @@
 
 #include <utility>
 
+#include "base/files/scoped_temp_dir.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
-#include "base/test/task_environment.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_prefs.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_utils.h"
 #include "brave/components/brave_wallet/browser/fil_transaction.h"
@@ -26,6 +26,7 @@
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
 #include "brave/components/brave_wallet/common/features.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
+#include "content/public/test/browser_task_environment.h"
 #include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
@@ -80,8 +81,10 @@ class FilTxManagerUnitTest : public testing::Test {
         std::make_unique<JsonRpcService>(shared_url_loader_factory_, &prefs_);
     keyring_service_ = std::make_unique<KeyringService>(json_rpc_service_.get(),
                                                         &prefs_, &local_state_);
+    ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
     tx_service_ = std::make_unique<TxService>(json_rpc_service_.get(), nullptr,
-                                              keyring_service_.get(), &prefs_);
+                                              keyring_service_.get(), &prefs_,
+                                              temp_dir_.GetPath());
 
     keyring_service_->CreateWallet("testing123", base::DoNothing());
     base::RunLoop().RunUntilIdle();
@@ -225,7 +228,8 @@ class FilTxManagerUnitTest : public testing::Test {
 
  protected:
   base::test::ScopedFeatureList feature_list_;
-  base::test::TaskEnvironment task_environment_;
+  content::BrowserTaskEnvironment task_environment_;
+  base::ScopedTempDir temp_dir_;
   sync_preferences::TestingPrefServiceSyncable prefs_;
   sync_preferences::TestingPrefServiceSyncable local_state_;
   network::TestURLLoaderFactory url_loader_factory_;

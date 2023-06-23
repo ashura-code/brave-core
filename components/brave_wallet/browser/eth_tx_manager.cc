@@ -113,8 +113,9 @@ bool EthTxManager::ValidateTxData1559(const mojom::TxData1559Ptr& tx_data,
 EthTxManager::EthTxManager(TxService* tx_service,
                            JsonRpcService* json_rpc_service,
                            KeyringService* keyring_service,
-                           PrefService* prefs)
-    : TxManager(std::make_unique<EthTxStateManager>(prefs),
+                           PrefService* prefs,
+                           value_store::ValueStoreFrontend* store)
+    : TxManager(std::make_unique<EthTxStateManager>(prefs, store),
                 std::make_unique<EthBlockTracker>(json_rpc_service),
                 tx_service,
                 json_rpc_service,

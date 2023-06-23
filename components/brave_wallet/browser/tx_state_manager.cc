@@ -16,14 +16,18 @@
 #include "brave/components/brave_wallet/browser/tx_meta.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
+#include "components/value_store/value_store_frontend.h"
 #include "url/origin.h"
 
 namespace brave_wallet {
 
 namespace {
 
-constexpr size_t kMaxConfirmedTxNum = 10;
-constexpr size_t kMaxRejectedTxNum = 10;
+constexpr size_t kMaxConfirmedTxNum = 500;
+constexpr size_t kMaxRejectedTxNum = 500;
+constexpr char kStorageTransactions[] = "transactions";
+constexpr size_t kMaxInitRetryAttempts = 3;
+constexpr int kDelayedInitRetryMsec = 500;
 
 }  // namespace
 
@@ -107,41 +111,72 @@ bool TxStateManager::ValueToTxMeta(const base::Value::Dict& value,
   return true;
 }
 
-TxStateManager::TxStateManager(PrefService* prefs)
-    : prefs_(prefs), weak_factory_(this) {}
+TxStateManager::TxStateManager(PrefService* prefs,
+                               value_store::ValueStoreFrontend* store)
+    : prefs_(prefs), initialized_(false), store_(store), weak_factory_(this) {
+  Initialize();
+}
 
 TxStateManager::~TxStateManager() = default;
 
+void TxStateManager::Initialize() {
+  store_->Get(kStorageTransactions, base::BindOnce(&TxStateManager::OnTxsRead,
+                                                   weak_factory_.GetWeakPtr()));
+}
+
+void TxStateManager::OnTxsRead(absl::optional<base::Value> txs) {
+  if (txs) {
+    txs_ = std::move(txs->GetDict());
+  }
+  initialized_ = true;
+}
+
+void TxStateManager::ScheduleWrite(size_t retry_attempts) {
+  // Schedule a delayed task with maximum retry.
+  if (!initialized_) {
+    if (retry_attempts < kMaxInitRetryAttempts) {
+      base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(&TxStateManager::ScheduleWrite,
+                         weak_factory_.GetWeakPtr(), retry_attempts + 1),
+          base::Milliseconds(kDelayedInitRetryMsec));
+    } else {
+      LOG(ERROR)
+          << "TxStateManager wait for init maximum retry attempts reached.";
+      // Skip and wait for the next one.
+      return;
+    }
+  }
+  store_->Set(kStorageTransactions, base::Value(txs_.Clone()));
+}
+
 void TxStateManager::AddOrUpdateTx(const TxMeta& meta) {
-  ScopedDictPrefUpdate update(prefs_, kBraveWalletTransactions);
-  base::Value::Dict& dict = update.Get();
   const std::string path =
       base::JoinString({GetTxPrefPathPrefix(meta.chain_id()), meta.id()}, ".");
 
-  bool is_add = dict.FindByDottedPath(path) == nullptr;
-  dict.SetByDottedPath(path, meta.ToValue());
+  bool is_add = txs_.FindByDottedPath(path) == nullptr;
+  txs_.SetByDottedPath(path, meta.ToValue());
+  ScheduleWrite(0);
   if (!is_add) {
     for (auto& observer : observers_) {
       observer.OnTransactionStatusChanged(meta.ToTransactionInfo());
     }
-    return;
-  }
+  } else {
+    for (auto& observer : observers_) {
+      observer.OnNewUnapprovedTx(meta.ToTransactionInfo());
+    }
 
-  for (auto& observer : observers_) {
-    observer.OnNewUnapprovedTx(meta.ToTransactionInfo());
+    // We only keep most recent 1k confirmed plus rejected tx metas per network
+    RetireTxByStatus(meta.chain_id(), mojom::TransactionStatus::Confirmed,
+                     kMaxConfirmedTxNum);
+    RetireTxByStatus(meta.chain_id(), mojom::TransactionStatus::Rejected,
+                     kMaxRejectedTxNum);
   }
-
-  // We only keep most recent 10 confirmed and rejected tx metas per network
-  RetireTxByStatus(meta.chain_id(), mojom::TransactionStatus::Confirmed,
-                   kMaxConfirmedTxNum);
-  RetireTxByStatus(meta.chain_id(), mojom::TransactionStatus::Rejected,
-                   kMaxRejectedTxNum);
 }
 
 std::unique_ptr<TxMeta> TxStateManager::GetTx(const std::string& chain_id,
                                               const std::string& id) {
-  const auto& dict = prefs_->GetDict(kBraveWalletTransactions);
-  const base::Value::Dict* value = dict.FindDictByDottedPath(
+  const base::Value::Dict* value = txs_.FindDictByDottedPath(
       base::JoinString({GetTxPrefPathPrefix(chain_id), id}, "."));
   if (!value) {
     return nullptr;
@@ -152,14 +187,14 @@ std::unique_ptr<TxMeta> TxStateManager::GetTx(const std::string& chain_id,
 
 void TxStateManager::DeleteTx(const std::string& chain_id,
                               const std::string& id) {
-  ScopedDictPrefUpdate update(prefs_, kBraveWalletTransactions);
-  update->RemoveByDottedPath(
+  txs_.RemoveByDottedPath(
       base::JoinString({GetTxPrefPathPrefix(chain_id), id}, "."));
+  ScheduleWrite(0);
 }
 
 void TxStateManager::WipeTxs() {
-  ScopedDictPrefUpdate update(prefs_, kBraveWalletTransactions);
-  update->RemoveByDottedPath(GetTxPrefPathPrefix(absl::nullopt));
+  txs_.RemoveByDottedPath(GetTxPrefPathPrefix(absl::nullopt));
+  ScheduleWrite(0);
 }
 
 std::vector<std::unique_ptr<TxMeta>> TxStateManager::GetTransactionsByStatus(
@@ -167,9 +202,8 @@ std::vector<std::unique_ptr<TxMeta>> TxStateManager::GetTransactionsByStatus(
     const absl::optional<mojom::TransactionStatus>& status,
     const absl::optional<std::string>& from) {
   std::vector<std::unique_ptr<TxMeta>> result;
-  const auto& dict = prefs_->GetDict(kBraveWalletTransactions);
   const base::Value::Dict* network_dict =
-      dict.FindDictByDottedPath(GetTxPrefPathPrefix(chain_id));
+      txs_.FindDictByDottedPath(GetTxPrefPathPrefix(chain_id));
   if (!network_dict) {
     return result;
   }
