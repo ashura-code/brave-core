@@ -253,6 +253,7 @@ class EthTxManagerUnitTest : public testing::Test {
 
     brave_wallet::RegisterProfilePrefs(profile_prefs_.registry());
     brave_wallet::RegisterLocalStatePrefs(local_state_.registry());
+    brave_wallet::RegisterProfilePrefsForMigration(profile_prefs_.registry());
     json_rpc_service_ = std::make_unique<JsonRpcService>(
         shared_url_loader_factory_, &profile_prefs_);
     keyring_service_ = std::make_unique<KeyringService>(

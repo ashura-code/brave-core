@@ -373,4 +373,25 @@ void TxStateManager::MigrateSolanaTransactionsForV0TransactionsSupport(
   prefs->SetBoolean(kBraveWalletSolanaTransactionsV0SupportMigrated, true);
 }
 
+// static
+void TxStateManager::MigrateTransactionsFromPrefsToDB(
+    PrefService* prefs,
+    value_store::ValueStoreFrontend* store) {
+  if (prefs->GetBoolean(kBraveWalletTransactionsFromPrefsToDBMigrated)) {
+    return;
+  }
+
+  if (!prefs->HasPrefPath(kBraveWalletTransactions)) {
+    prefs->SetBoolean(kBraveWalletTransactionsFromPrefsToDBMigrated, true);
+    return;
+  }
+
+  const auto& txs = prefs->GetDict(kBraveWalletTransactions);
+  store->Set(kStorageTransactions, base::Value(txs.Clone()));
+
+  // Keep kBraveWalletTransactions in case we need to revert the migration and
+  // remove it when we delete the pref
+  prefs->SetBoolean(kBraveWalletTransactionsFromPrefsToDBMigrated, true);
+}
+
 }  // namespace brave_wallet

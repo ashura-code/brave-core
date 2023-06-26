@@ -47,6 +47,9 @@ class TxStateManager {
   static void MigrateAddChainIdToTransactionInfo(PrefService* prefs);
   static void MigrateSolanaTransactionsForV0TransactionsSupport(
       PrefService* prefs);
+  static void MigrateTransactionsFromPrefsToDB(
+      PrefService* prefs,
+      value_store::ValueStoreFrontend* store);
 
   std::vector<std::unique_ptr<TxMeta>> GetTransactionsByStatus(
       const absl::optional<std::string>& chain_id,
@@ -71,6 +74,8 @@ class TxStateManager {
 
  private:
   FRIEND_TEST_ALL_PREFIXES(TxStateManagerUnitTest, TxOperations);
+  FRIEND_TEST_ALL_PREFIXES(TxStateManagerUnitTest,
+                           MigrateTransactionsFromPrefsToDB);
   FRIEND_TEST_ALL_PREFIXES(EthTxManagerUnitTest, Reset);
 
   // Read all txs from db

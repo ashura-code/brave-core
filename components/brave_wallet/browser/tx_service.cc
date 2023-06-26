@@ -16,6 +16,7 @@
 #include "brave/components/brave_wallet/browser/json_rpc_service.h"
 #include "brave/components/brave_wallet/browser/solana_tx_manager.h"
 #include "brave/components/brave_wallet/browser/tx_manager.h"
+#include "brave/components/brave_wallet/browser/tx_state_manager.h"
 #include "brave/components/brave_wallet/common/fil_address.h"
 #include "components/value_store/value_store_factory_impl.h"
 #include "components/value_store/value_store_frontend.h"
@@ -81,6 +82,8 @@ TxService::TxService(JsonRpcService* json_rpc_service,
       content::GetUIThreadTaskRunner({}),
 #endif
       value_store::GetValueStoreTaskRunner());
+
+  TxStateManager::MigrateTransactionsFromPrefsToDB(prefs, store_.get());
 
   tx_manager_map_[mojom::CoinType::ETH] =
       std::unique_ptr<TxManager>(new EthTxManager(
