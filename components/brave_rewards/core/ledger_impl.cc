@@ -22,7 +22,8 @@ namespace brave_rewards::internal {
 
 LedgerImpl::LedgerImpl(
     mojo::PendingAssociatedRemote<mojom::LedgerClient> ledger_client_remote)
-    : ledger_client_(std::move(ledger_client_remote)),
+    : RewardsEngineContext(*this),
+      ledger_client_(std::move(ledger_client_remote)),
       promotion_(*this),
       publisher_(*this),
       media_(*this),

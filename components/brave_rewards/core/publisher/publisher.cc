@@ -32,38 +32,48 @@ using std::placeholders::_2;
 namespace brave_rewards::internal {
 namespace publisher {
 
-Publisher::Publisher(LedgerImpl& ledger)
-    : ledger_(ledger),
-      prefix_list_updater_(ledger),
-      server_publisher_fetcher_(ledger) {}
+Publisher::Publisher(LedgerImpl& ledger) : ledger_(ledger) {}
 
 Publisher::~Publisher() = default;
-
-bool Publisher::ShouldFetchServerPublisherInfo(
-    mojom::ServerPublisherInfo* server_info) {
-  return server_publisher_fetcher_.IsExpired(server_info);
-}
 
 void Publisher::FetchServerPublisherInfo(
     const std::string& publisher_key,
     database::GetServerPublisherInfoCallback callback) {
-  server_publisher_fetcher_.Fetch(publisher_key, callback);
+  ledger_->GetHelper<ServerPublisherFetcher>().Fetch(
+      publisher_key,
+      base::BindOnce(&Publisher::OnPublisherInfoFetched,
+                     weak_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+void Publisher::OnPublisherInfoFetched(
+    database::GetServerPublisherInfoCallback callback,
+    mojom::ServerPublisherInfoPtr info) {
+  callback(std::move(info));
 }
 
 void Publisher::RefreshPublisher(const std::string& publisher_key,
                                  RefreshPublisherCallback callback) {
   // Bypass cache and unconditionally fetch the latest info
   // for the specified publisher.
-  server_publisher_fetcher_.Fetch(publisher_key, [callback](auto server_info) {
-    auto status = server_info ? server_info->status
-                              : mojom::PublisherStatus::NOT_VERIFIED;
-    callback(status);
-  });
+  ledger_->GetHelper<ServerPublisherFetcher>().Fetch(
+      publisher_key,
+      base::BindOnce(&Publisher::OnPublisherRefreshed,
+                     weak_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+void Publisher::OnPublisherRefreshed(RefreshPublisherCallback callback,
+                                     mojom::ServerPublisherInfoPtr info) {
+  callback(info ? info->status : mojom::PublisherStatus::NOT_VERIFIED);
 }
 
 void Publisher::SetPublisherServerListTimer() {
-  prefix_list_updater_.StartAutoUpdate(
-      [this]() { ledger_->client()->OnPublisherRegistryUpdated(); });
+  ledger_->GetHelper<PublisherPrefixListUpdater>().StartAutoUpdate(
+      base::BindRepeating(&Publisher::OnPrefixListUpdated,
+                          weak_factory_.GetWeakPtr()));
+}
+
+void Publisher::OnPrefixListUpdated() {
+  ledger_->client()->OnPublisherRegistryUpdated();
 }
 
 void Publisher::CalcScoreConsts(const int min_duration_seconds) {
@@ -677,7 +687,8 @@ void Publisher::OnServerPublisherInfoLoaded(
     return;
   }
 
-  if (ShouldFetchServerPublisherInfo(server_info.get())) {
+  if (!server_info ||
+      ledger_->GetHelper<ServerPublisherFetcher>().IsExpired(*server_info)) {
     // Store the current server publisher info so that if fetching fails
     // we can execute the callback with the last known valid data.
     auto shared_info =

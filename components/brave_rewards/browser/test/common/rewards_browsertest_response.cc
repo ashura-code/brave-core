@@ -200,7 +200,7 @@ void RewardsBrowserTestResponse::LoadMocks() {
   };
 
   for (auto& key : publisher_keys) {
-    std::string prefix = internal::publisher::GetHashPrefixRaw(key, 4);
+    std::string prefix = internal::GetPublisherHashPrefixRaw(key, 4);
     publisher_prefixes_[prefix] = key;
   }
 }
