@@ -17,6 +17,7 @@
 #include "brave/browser/ui/brave_browser.h"
 #include "brave/browser/ui/sidebar/sidebar_controller.h"
 #include "brave/browser/ui/sidebar/sidebar_model.h"
+#include "brave/browser/ui/sidebar/sidebar_utils.h"
 #include "brave/browser/ui/views/side_panel/playlist/playlist_side_panel_coordinator.h"
 #include "brave/components/constants/brave_paths.h"
 #include "brave/components/constants/webui_url_constants.h"
@@ -30,6 +31,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/side_panel/side_panel_ui.h"
 #include "chrome/test/base/chrome_test_utils.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "content/public/test/browser_test.h"
@@ -81,17 +83,8 @@ class PlaylistBrowserTest : public PlatformBrowserTest {
   void ActivatePlaylistSidePanel() {
     auto* sidebar_controller =
         static_cast<BraveBrowser*>(browser())->sidebar_controller();
-    auto* sidebar_model = sidebar_controller->model();
-    const auto& sidebar_items = sidebar_model->GetAllSidebarItems();
-    auto iter = base::ranges::find_if(sidebar_items, [](const auto& item) {
-      return item.built_in_item_type ==
-             sidebar::SidebarItem::BuiltInItemType::kPlaylist;
-    });
-
-    // Wrap routine with lambda as ASSERT_FOO has return type internally.
-    ([&]() { ASSERT_NE(iter, sidebar_items.end()); })();
-    sidebar_controller->ActivateItemAt(
-        std::distance(sidebar_items.begin(), iter));
+    sidebar_controller->ActivatePanelItem(
+        sidebar::SidebarItem::BuiltInItemType::kPlaylist);
   }
 
   content::WebContents* GetPlaylistWebContents() {
