@@ -93,8 +93,9 @@ bool BraveTabStrip::ShouldDrawStrokes() const {
   // enabled state. Although TabStrip::ShouldDrawStrokes() has related code,
   // that feature is already expired since cr82. See
   // chrome/browser/flag-metadata.json.
-  const SkColor background_color = GetTabBackgroundColor(
-      TabActive::kActive, BrowserFrameActiveState::kActive);
+  const SkColor background_color = TabStyle::Get()->GetTabBackgroundColor(
+      TabStyle::TabSelectionState::kActive, /*frame_active*/ true,
+      *GetColorProvider());
   const SkColor frame_color =
       controller_->GetFrameColor(BrowserFrameActiveState::kActive);
   const float contrast_ratio =
@@ -172,20 +173,20 @@ void BraveTabStrip::AddedToWidget() {
   }
 }
 
-SkColor BraveTabStrip::GetTabBackgroundColor(
-    TabActive active,
-    BrowserFrameActiveState active_state) const {
-  if (!ShouldShowVerticalTabs())
-    return TabStrip::GetTabBackgroundColor(active, active_state);
+// SkColor BraveTabStrip::GetTabBackgroundColor(
+//     TabActive active,
+//     BrowserFrameActiveState active_state) const {
+//   if (!ShouldShowVerticalTabs())
+//     return TabStrip::GetTabBackgroundColor(active, active_state);
 
-  const ui::ColorProvider* cp = GetColorProvider();
-  if (!cp)
-    return gfx::kPlaceholderColor;
+//   const ui::ColorProvider* cp = GetColorProvider();
+//   if (!cp)
+//     return gfx::kPlaceholderColor;
 
-  return cp->GetColor(active == TabActive::kActive
-                          ? kColorBraveVerticalTabActiveBackground
-                          : kColorBraveVerticalTabInactiveBackground);
-}
+//   return cp->GetColor(active == TabActive::kActive
+//                           ? kColorBraveVerticalTabActiveBackground
+//                           : kColorBraveVerticalTabInactiveBackground);
+// }
 
 SkColor BraveTabStrip::GetTabSeparatorColor() const {
   if (ShouldShowVerticalTabs())
