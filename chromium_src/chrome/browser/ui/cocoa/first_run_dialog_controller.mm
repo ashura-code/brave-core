@@ -49,14 +49,12 @@
                                     IDS_FIRSTRUN_DLG_CANCEL_BUTTON_LABEL)
                          target:self
                          action:@selector(cancel:)];
-  [maybeLaterButton setKeyEquivalent:kKeyEquivalentEscape];
   [maybeLaterButton sizeToFit];
 
   NSButton* makeDefaultButton = [NSButton
       buttonWithTitle:l10n_util::GetNSString(IDS_FIRSTRUN_DLG_OK_BUTTON_LABEL)
                target:self
                action:@selector(ok:)];
-  [makeDefaultButton setKeyEquivalent:kKeyEquivalentReturn];
   [makeDefaultButton sizeToFit];
 
   // Calculate proper dialog width that can include two buttons.
