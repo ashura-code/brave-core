@@ -19,6 +19,7 @@
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/omnibox/browser/autocomplete_provider_client.h"
 #include "components/omnibox/browser/autocomplete_result.h"
+#include "components/omnibox/browser/omnibox_controller.h"
 #include "components/omnibox/browser/omnibox_edit_model.h"
 #include "components/omnibox/browser/omnibox_popup_selection.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -62,12 +63,12 @@ void BraveOmniboxResultView::OnSelectionStateChanged() {
 }
 
 void BraveOmniboxResultView::OpenMatch() {
-  model_->OpenSelection(OmniboxPopupSelection(model_index_),
-                        base::TimeTicks::Now());
+  popup_view_->model()->OpenSelection(OmniboxPopupSelection(model_index_),
+                                      base::TimeTicks::Now());
 }
 
 void BraveOmniboxResultView::Dismiss() {
-  auto* controller = model_->autocomplete_controller();
+  auto* controller = popup_view_->controller()->autocomplete_controller();
   auto* prefs = controller->autocomplete_provider_client()->GetPrefs();
   SetDismissed(prefs);
 
@@ -103,7 +104,7 @@ void BraveOmniboxResultView::UpdateForBraveSearchConversion() {
   brave_search_promotion_view_->SetVisible(true);
   brave_search_promotion_view_->SetTypeAndInput(
       GetConversionTypeFromMatch(match_),
-      model_->autocomplete_controller()->input().text());
+      popup_view_->controller()->autocomplete_controller()->input().text());
 }
 
 BEGIN_METADATA(BraveOmniboxResultView, OmniboxResultView)

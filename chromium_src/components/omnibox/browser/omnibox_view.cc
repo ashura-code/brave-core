@@ -27,8 +27,4 @@ class BraveOmniboxController : public OmniboxController {
   }
 };
 
-#define OmniboxController BraveOmniboxController
-
 #include "src/components/omnibox/browser/omnibox_view.cc"
-
-#undef OmniboxController
