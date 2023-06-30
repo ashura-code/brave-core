@@ -50,7 +50,7 @@
 #include "brave/components/brave_rewards/common/features.h"
 #include "brave/components/brave_rewards/common/pref_names.h"
 #include "brave/components/brave_rewards/core/global_constants.h"
-#include "brave/components/brave_rewards/core/ledger_database.h"
+#include "brave/components/brave_rewards/core/rewards_database.h"
 #include "brave/components/brave_rewards/resources/grit/brave_rewards_resources.h"
 #include "brave/grit/brave_generated_resources.h"
 #include "chrome/browser/bitmap_fetcher/bitmap_fetcher_service_factory.h"
@@ -147,13 +147,13 @@ std::pair<std::string, base::Value> LoadStateOnFileTaskRunner(
   std::string error_message;
   auto value = deserializer.Deserialize(&error_code, &error_message);
   if (!value) {
-    VLOG(0) << "Cannot deserialize ledger state, error code: " << error_code
-        << " message: " << error_message;
+    VLOG(0) << "Cannot deserialize state, error code: " << error_code
+            << " message: " << error_message;
     return result;
   }
 
   if (!value->is_dict()) {
-    VLOG(0) << "Corrupted ledger state.";
+    VLOG(0) << "Corrupted legacy state.";
     return result;
   }
 
@@ -267,13 +267,13 @@ void DeferCallback(base::Location location, Callback callback, Args&&... args) {
 // read comment about file pathes at src\base\files\file_path.h
 #if BUILDFLAG(IS_WIN)
 const base::FilePath::StringType kDiagnosticLogPath(L"Rewards.log");
-const base::FilePath::StringType kLedger_state(L"ledger_state");
+const base::FilePath::StringType kLegacy_state(L"ledger_state");
 const base::FilePath::StringType kPublisher_state(L"publisher_state");
 const base::FilePath::StringType kPublisher_info_db(L"publisher_info_db");
 const base::FilePath::StringType kPublishers_list(L"publishers_list");
 #else
 const base::FilePath::StringType kDiagnosticLogPath("Rewards.log");
-const base::FilePath::StringType kLedger_state("ledger_state");
+const base::FilePath::StringType kLegacy_state("ledger_state");
 const base::FilePath::StringType kPublisher_state("publisher_state");
 const base::FilePath::StringType kPublisher_info_db("publisher_info_db");
 const base::FilePath::StringType kPublishers_list("publishers_list");
@@ -296,7 +296,7 @@ RewardsServiceImpl::RewardsServiceImpl(Profile* profile)
            base::TaskShutdownBehavior::BLOCK_SHUTDOWN})),
       json_sanitizer_task_runner_(base::ThreadPool::CreateSequencedTaskRunner(
           {base::MayBlock(), base::TaskPriority::BEST_EFFORT})),
-      ledger_state_path_(profile_->GetPath().Append(kLedger_state)),
+      legacy_state_path_(profile_->GetPath().Append(kLegacy_state)),
       publisher_state_path_(profile_->GetPath().Append(kPublisher_state)),
       publisher_info_db_path_(profile->GetPath().Append(kPublisher_info_db)),
       publisher_list_path_(profile->GetPath().Append(kPublishers_list)),
@@ -339,13 +339,13 @@ RewardsServiceImpl::~RewardsServiceImpl() {
 }
 
 void RewardsServiceImpl::ConnectionClosed() {
-  BLOG(0, "Restarting ledger process after disconnect");
+  BLOG(0, "Restarting engine process after disconnect");
 
   Reset();
 
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
       FROM_HERE,
-      base::BindOnce(&RewardsServiceImpl::StartLedgerProcessIfNecessary,
+      base::BindOnce(&RewardsServiceImpl::StartEngineProcessIfNecessary,
                      AsWeakPtr()),
       base::Seconds(10));
 }
@@ -387,7 +387,7 @@ void RewardsServiceImpl::InitPrefChangeRegistrar() {
 void RewardsServiceImpl::OnPreferenceChanged(const std::string& key) {
   if (key == prefs::kAutoContributeEnabled) {
     if (profile_->GetPrefs()->GetBoolean(prefs::kAutoContributeEnabled)) {
-      StartLedgerProcessIfNecessary();
+      StartEngineProcessIfNecessary();
     }
     // Must check for connected external wallet before recording
     // AC state.
@@ -432,39 +432,39 @@ void RewardsServiceImpl::CheckPreferences() {
   if (prefs->GetUserPrefValue(prefs::kEnabled)) {
     // If the "enabled" pref is set, then start the background Rewards
     // utility process.
-    StartLedgerProcessIfNecessary();
+    StartEngineProcessIfNecessary();
   }
 }
 
-void RewardsServiceImpl::StartLedgerProcessIfNecessary() {
+void RewardsServiceImpl::StartEngineProcessIfNecessary() {
   if (Connected()) {
-    BLOG(1, "Ledger process is already running");
+    BLOG(1, "Engine process is already running");
     return;
   }
 
-  ledger_database_ = base::SequenceBound<internal::LedgerDatabase>(
+  rewards_database_ = base::SequenceBound<internal::RewardsDatabase>(
       file_task_runner_, publisher_info_db_path_);
 
-  BLOG(1, "Starting ledger process");
+  BLOG(1, "Starting engine process");
 
-  if (!ledger_factory_.is_bound()) {
+  if (!engine_factory_.is_bound()) {
     content::ServiceProcessHost::Launch(
-        ledger_factory_.BindNewPipeAndPassReceiver(),
+        engine_factory_.BindNewPipeAndPassReceiver(),
         content::ServiceProcessHost::Options()
-            .WithDisplayName(IDS_UTILITY_PROCESS_LEDGER_NAME)
+            .WithDisplayName(IDS_UTILITY_PROCESS_REWARDS_NAME)
             .Pass());
 
-    ledger_factory_.set_disconnect_handler(
+    engine_factory_.set_disconnect_handler(
         base::BindOnce(&RewardsServiceImpl::ConnectionClosed, AsWeakPtr()));
   }
 
-  ledger_factory_->CreateLedger(
-      ledger_.BindNewEndpointAndPassReceiver(),
+  engine_factory_->CreateRewardsEngine(
+      engine_.BindNewEndpointAndPassReceiver(),
       receiver_.BindNewEndpointAndPassRemote(),
-      base::BindOnce(&RewardsServiceImpl::OnLedgerCreated, AsWeakPtr()));
+      base::BindOnce(&RewardsServiceImpl::OnEngineCreated, AsWeakPtr()));
 }
 
-void RewardsServiceImpl::OnLedgerCreated() {
+void RewardsServiceImpl::OnEngineCreated() {
   if (!Connected()) {
     return;
   }
@@ -472,10 +472,10 @@ void RewardsServiceImpl::OnLedgerCreated() {
   SetEnvironment(GetDefaultServerEnvironment());
   SetDebug(false);
   HandleFlags(RewardsFlags::ForCurrentProcess());
-  PrepareLedgerEnvForTesting();
+  PrepareEngineEnvForTesting();
 
-  ledger_->Initialize(
-      base::BindOnce(&RewardsServiceImpl::OnLedgerInitialized, AsWeakPtr()));
+  engine_->Initialize(
+      base::BindOnce(&RewardsServiceImpl::OnEngineInitialized, AsWeakPtr()));
 }
 
 void RewardsServiceImpl::CreateRewardsWallet(
@@ -553,14 +553,14 @@ void RewardsServiceImpl::CreateRewardsWallet(
       std::move(callback).Run(CreateRewardsWalletResult::kSuccess);
     };
 
-    self->ledger_->CreateRewardsWallet(
+    self->engine_->CreateRewardsWallet(
         country,
         base::BindOnce(on_created, self, country, std::move(callback)));
   };
 
   ready_->Post(FROM_HERE, base::BindOnce(on_start, AsWeakPtr(), country,
                                          std::move(callback)));
-  StartLedgerProcessIfNecessary();
+  StartEngineProcessIfNecessary();
 }
 
 void RewardsServiceImpl::GetUserType(
@@ -653,7 +653,7 @@ void RewardsServiceImpl::GetAvailableCountries(
     return std::move(callback).Run(kNonBitflyerCountries);
   };
 
-  ledger_->GetExternalWallet(
+  engine_->GetExternalWallet(
       GetExternalWalletType(),
       base::BindOnce(on_external_wallet, std::move(callback)));
 }
@@ -668,7 +668,7 @@ void RewardsServiceImpl::GetActivityInfoList(
                          std::vector<mojom::PublisherInfoPtr>());
   }
 
-  ledger_->GetActivityInfoList(
+  engine_->GetActivityInfoList(
       start, limit, std::move(filter),
       base::BindOnce(&RewardsServiceImpl::OnGetPublisherInfoList, AsWeakPtr(),
                      std::move(callback)));
@@ -679,7 +679,7 @@ void RewardsServiceImpl::GetPublishersVisitedCount(
   if (!Connected()) {
     return DeferCallback(FROM_HERE, std::move(callback), 0);
   }
-  ledger_->GetPublishersVisitedCount(std::move(callback));
+  engine_->GetPublishersVisitedCount(std::move(callback));
 }
 
 void RewardsServiceImpl::GetExcludedList(
@@ -689,7 +689,7 @@ void RewardsServiceImpl::GetExcludedList(
                          std::vector<mojom::PublisherInfoPtr>());
   }
 
-  ledger_->GetExcludedList(
+  engine_->GetExcludedList(
       base::BindOnce(&RewardsServiceImpl::OnGetPublisherInfoList, AsWeakPtr(),
                      std::move(callback)));
 }
@@ -720,7 +720,7 @@ void RewardsServiceImpl::OnLoad(SessionID tab_id, const GURL& url) {
   data->path = url.path();
   data->tab_id = tab_id.id();
   data->url = url.scheme() + "://" + *publisher_domain + "/";
-  ledger_->OnLoad(std::move(data), GetCurrentTimestamp());
+  engine_->OnLoad(std::move(data), GetCurrentTimestamp());
 }
 
 void RewardsServiceImpl::OnUnload(SessionID tab_id) {
@@ -728,7 +728,7 @@ void RewardsServiceImpl::OnUnload(SessionID tab_id) {
     return;
   }
 
-  ledger_->OnUnload(tab_id.id(), GetCurrentTimestamp());
+  engine_->OnUnload(tab_id.id(), GetCurrentTimestamp());
 }
 
 void RewardsServiceImpl::OnShow(SessionID tab_id) {
@@ -736,7 +736,7 @@ void RewardsServiceImpl::OnShow(SessionID tab_id) {
     return;
   }
 
-  ledger_->OnShow(tab_id.id(), GetCurrentTimestamp());
+  engine_->OnShow(tab_id.id(), GetCurrentTimestamp());
 }
 
 void RewardsServiceImpl::OnHide(SessionID tab_id) {
@@ -744,7 +744,7 @@ void RewardsServiceImpl::OnHide(SessionID tab_id) {
     return;
   }
 
-  ledger_->OnHide(tab_id.id(), GetCurrentTimestamp());
+  engine_->OnHide(tab_id.id(), GetCurrentTimestamp());
 }
 
 void RewardsServiceImpl::OnForeground(SessionID tab_id) {
@@ -752,7 +752,7 @@ void RewardsServiceImpl::OnForeground(SessionID tab_id) {
     return;
   }
 
-  ledger_->OnForeground(tab_id.id(), GetCurrentTimestamp());
+  engine_->OnForeground(tab_id.id(), GetCurrentTimestamp());
 }
 
 void RewardsServiceImpl::OnBackground(SessionID tab_id) {
@@ -760,7 +760,7 @@ void RewardsServiceImpl::OnBackground(SessionID tab_id) {
     return;
   }
 
-  ledger_->OnBackground(tab_id.id(), GetCurrentTimestamp());
+  engine_->OnBackground(tab_id.id(), GetCurrentTimestamp());
 }
 
 void RewardsServiceImpl::OnXHRLoad(SessionID tab_id,
@@ -786,12 +786,12 @@ void RewardsServiceImpl::OnXHRLoad(SessionID tab_id,
   data->path = url.spec();
   data->tab_id = tab_id.id();
 
-  ledger_->OnXHRLoad(tab_id.id(), url.spec(), parts, first_party_url.spec(),
+  engine_->OnXHRLoad(tab_id.id(), url.spec(), parts, first_party_url.spec(),
                      referrer.spec(), std::move(data));
 }
 
 void RewardsServiceImpl::OnRestorePublishers(const mojom::Result result) {
-  if (result != mojom::Result::LEDGER_OK) {
+  if (result != mojom::Result::OK) {
     return;
   }
 
@@ -806,7 +806,7 @@ void RewardsServiceImpl::RestorePublishers() {
     return;
   }
 
-  ledger_->RestorePublishers(
+  engine_->RestorePublishers(
       base::BindOnce(&RewardsServiceImpl::OnRestorePublishers, AsWeakPtr()));
 }
 
@@ -828,12 +828,12 @@ void RewardsServiceImpl::Shutdown() {
   receiver_.reset();
   url_loaders_.clear();
 
-  ledger_.reset();
+  engine_.reset();
   RewardsService::Shutdown();
 }
 
-void RewardsServiceImpl::OnLedgerInitialized(mojom::Result result) {
-  if (result == mojom::Result::LEDGER_OK) {
+void RewardsServiceImpl::OnEngineInitialized(mojom::Result result) {
+  if (result == mojom::Result::OK) {
     StartNotificationTimers();
   }
 
@@ -857,18 +857,18 @@ void RewardsServiceImpl::GetAutoContributeProperties(
     return DeferCallback(FROM_HERE, std::move(callback), nullptr);
   }
 
-  ledger_->GetAutoContributeProperties(std::move(callback));
+  engine_->GetAutoContributeProperties(std::move(callback));
 }
 
 void RewardsServiceImpl::OnReconcileComplete(
     mojom::Result result,
     mojom::ContributionInfoPtr contribution) {
-  if (result == mojom::Result::LEDGER_OK &&
+  if (result == mojom::Result::OK &&
       contribution->type == mojom::RewardsType::RECURRING_TIP) {
     MaybeShowNotificationTipsPaid();
   }
 
-  if (result == mojom::Result::LEDGER_OK) {
+  if (result == mojom::Result::OK) {
     RecordBackendP3AStats();
   }
 
@@ -882,15 +882,15 @@ void RewardsServiceImpl::OnReconcileComplete(
         contribution->processor);
 }
 
-void RewardsServiceImpl::LoadLedgerState(LoadLedgerStateCallback callback) {
+void RewardsServiceImpl::LoadLegacyState(LoadLegacyStateCallback callback) {
   file_task_runner_->PostTaskAndReplyWithResult(
-      FROM_HERE, base::BindOnce(&LoadStateOnFileTaskRunner, ledger_state_path_),
-      base::BindOnce(&RewardsServiceImpl::OnLedgerStateLoaded, AsWeakPtr(),
+      FROM_HERE, base::BindOnce(&LoadStateOnFileTaskRunner, legacy_state_path_),
+      base::BindOnce(&RewardsServiceImpl::OnLegacyStateLoaded, AsWeakPtr(),
                      std::move(callback)));
 }
 
-void RewardsServiceImpl::OnLedgerStateLoaded(
-    LoadLedgerStateCallback callback,
+void RewardsServiceImpl::OnLegacyStateLoaded(
+    LoadLegacyStateCallback callback,
     std::pair<std::string, base::Value> state) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
@@ -905,8 +905,7 @@ void RewardsServiceImpl::OnLedgerStateLoaded(
   // Run callbacks.
   const std::string& data = state.first;
   std::move(callback).Run(
-      data.empty() ? mojom::Result::NO_LEDGER_STATE : mojom::Result::LEDGER_OK,
-      data);
+      data.empty() ? mojom::Result::NO_LEGACY_STATE : mojom::Result::OK, data);
 }
 
 void RewardsServiceImpl::LoadPublisherState(
@@ -925,9 +924,9 @@ void RewardsServiceImpl::OnPublisherStateLoaded(
     return;
   }
 
-  std::move(callback).Run(data.empty() ? mojom::Result::NO_PUBLISHER_STATE
-                                       : mojom::Result::LEDGER_OK,
-                          data);
+  std::move(callback).Run(
+      data.empty() ? mojom::Result::NO_PUBLISHER_STATE : mojom::Result::OK,
+      data);
 }
 
 void RewardsServiceImpl::LoadURL(mojom::UrlRequestPtr request,
@@ -1095,7 +1094,7 @@ void RewardsServiceImpl::GetRewardsParameters(
     return DeferCallback(FROM_HERE, std::move(callback), nullptr);
   }
 
-  ledger_->GetRewardsParameters(
+  engine_->GetRewardsParameters(
       base::BindOnce(&OnGetRewardsParameters, std::move(callback)));
 }
 
@@ -1136,7 +1135,7 @@ void RewardsServiceImpl::FetchPromotions(FetchPromotionsCallback callback) {
     std::move(callback).Run(std::move(promotions));
   };
 
-  ledger_->FetchPromotions(
+  engine_->FetchPromotions(
       base::BindOnce(on_fetch, AsWeakPtr(), std::move(callback)));
 }
 
@@ -1170,7 +1169,7 @@ void RewardsServiceImpl::OnClaimPromotion(ClaimPromotionCallback callback,
   std::string hint;
   std::string id;
 
-  if (result != mojom::Result::LEDGER_OK) {
+  if (result != mojom::Result::OK) {
     std::move(callback).Run(result, image, hint, id);
     return;
   }
@@ -1189,13 +1188,13 @@ void RewardsServiceImpl::AttestationAndroid(const std::string& promotion_id,
                                             AttestPromotionCallback callback,
                                             const mojom::Result result,
                                             const std::string& nonce) {
-  if (result != mojom::Result::LEDGER_OK) {
+  if (result != mojom::Result::OK) {
     std::move(callback).Run(result, nullptr);
     return;
   }
 
   if (nonce.empty()) {
-    std::move(callback).Run(mojom::Result::LEDGER_ERROR, nullptr);
+    std::move(callback).Run(mojom::Result::FAILED, nullptr);
     return;
   }
 
@@ -1216,7 +1215,7 @@ void RewardsServiceImpl::OnAttestationAndroid(
     const std::string& token,
     const bool attestation_passed) {
   if (!Connected() || !token_received) {
-    std::move(callback).Run(mojom::Result::LEDGER_ERROR, nullptr);
+    std::move(callback).Run(mojom::Result::FAILED, nullptr);
     return;
   }
 
@@ -1227,7 +1226,7 @@ void RewardsServiceImpl::OnAttestationAndroid(
   std::string json;
   base::JSONWriter::Write(solution, &json);
 
-  ledger_->AttestPromotion(
+  engine_->AttestPromotion(
       promotion_id, json,
       base::BindOnce(&RewardsServiceImpl::OnAttestPromotion, AsWeakPtr(),
                      std::move(callback)));
@@ -1237,23 +1236,23 @@ void RewardsServiceImpl::ClaimPromotion(
     const std::string& promotion_id,
     ClaimPromotionCallback callback) {
   if (!Connected()) {
-    return DeferCallback(FROM_HERE, std::move(callback),
-                         mojom::Result::LEDGER_ERROR, "", "", "");
+    return DeferCallback(FROM_HERE, std::move(callback), mojom::Result::FAILED,
+                         "", "", "");
   }
 
   auto claim_callback = base::BindOnce(&RewardsServiceImpl::OnClaimPromotion,
       AsWeakPtr(),
       std::move(callback));
 
-  ledger_->ClaimPromotion(promotion_id, "", std::move(claim_callback));
+  engine_->ClaimPromotion(promotion_id, "", std::move(claim_callback));
 }
 
 void RewardsServiceImpl::ClaimPromotion(
     const std::string& promotion_id,
     AttestPromotionCallback callback) {
   if (!Connected()) {
-    return DeferCallback(FROM_HERE, std::move(callback),
-                         mojom::Result::LEDGER_ERROR, nullptr);
+    return DeferCallback(FROM_HERE, std::move(callback), mojom::Result::FAILED,
+                         nullptr);
   }
 
   auto claim_callback = base::BindOnce(&RewardsServiceImpl::AttestationAndroid,
@@ -1261,7 +1260,7 @@ void RewardsServiceImpl::ClaimPromotion(
       promotion_id,
       std::move(callback));
 
-  ledger_->ClaimPromotion(promotion_id, "", std::move(claim_callback));
+  engine_->ClaimPromotion(promotion_id, "", std::move(claim_callback));
 }
 
 std::vector<std::string> RewardsServiceImpl::GetExternalWalletProviders()
@@ -1288,11 +1287,11 @@ void RewardsServiceImpl::AttestPromotion(
     const std::string& solution,
     AttestPromotionCallback callback) {
   if (!Connected()) {
-    return DeferCallback(FROM_HERE, std::move(callback),
-                         mojom::Result::LEDGER_ERROR, nullptr);
+    return DeferCallback(FROM_HERE, std::move(callback), mojom::Result::FAILED,
+                         nullptr);
   }
 
-  ledger_->AttestPromotion(
+  engine_->AttestPromotion(
       promotion_id, solution,
       base::BindOnce(&RewardsServiceImpl::OnAttestPromotion, AsWeakPtr(),
                      std::move(callback)));
@@ -1301,7 +1300,7 @@ void RewardsServiceImpl::AttestPromotion(
 void RewardsServiceImpl::OnAttestPromotion(AttestPromotionCallback callback,
                                            const mojom::Result result,
                                            mojom::PromotionPtr promotion) {
-  if (result != mojom::Result::LEDGER_OK) {
+  if (result != mojom::Result::OK) {
     std::move(callback).Run(result, nullptr);
     return;
   }
@@ -1318,7 +1317,7 @@ void RewardsServiceImpl::GetReconcileStamp(GetReconcileStampCallback callback) {
     return DeferCallback(FROM_HERE, std::move(callback), 0);
   }
 
-  ledger_->GetReconcileStamp(std::move(callback));
+  engine_->GetReconcileStamp(std::move(callback));
 }
 
 #if BUILDFLAG(ENABLE_GREASELION)
@@ -1359,11 +1358,11 @@ void RewardsServiceImpl::OnRulesReady(
 }
 #endif
 
-void RewardsServiceImpl::StopLedger(StopLedgerCallback callback) {
-  BLOG(1, "Shutting down ledger process");
+void RewardsServiceImpl::StopEngine(StopEngineCallback callback) {
+  BLOG(1, "Shutting down rewards process");
   if (!Connected()) {
-    BLOG(1, "Ledger process not running");
-    OnStopLedger(std::move(callback), mojom::Result::LEDGER_OK);
+    BLOG(1, "Rewards process not running");
+    OnStopEngine(std::move(callback), mojom::Result::OK);
     return;
   }
 
@@ -1371,20 +1370,20 @@ void RewardsServiceImpl::StopLedger(StopLedgerCallback callback) {
   p3a_tip_report_timer_.Stop();
   p3a::RecordNoWalletCreatedForAllMetrics();
 
-  ledger_->Shutdown(base::BindOnce(&RewardsServiceImpl::OnStopLedger,
+  engine_->Shutdown(base::BindOnce(&RewardsServiceImpl::OnStopEngine,
                                    AsWeakPtr(), std::move(callback)));
 }
 
-void RewardsServiceImpl::OnStopLedger(StopLedgerCallback callback,
+void RewardsServiceImpl::OnStopEngine(StopEngineCallback callback,
                                       const mojom::Result result) {
-  BLOG_IF(1, result != mojom::Result::LEDGER_OK,
-          "Ledger process was not shut down successfully");
+  BLOG_IF(1, result != mojom::Result::OK,
+          "Rewards process was not shut down successfully");
   Reset();
-  BLOG(1, "Successfully shutdown ledger");
+  BLOG(1, "Successfully shutdown rewards process");
   std::move(callback).Run(result);
 }
 
-void RewardsServiceImpl::OnStopLedgerForCompleteReset(
+void RewardsServiceImpl::OnStopEngineForCompleteReset(
     SuccessCallback callback,
     const mojom::Result result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -1399,10 +1398,10 @@ void RewardsServiceImpl::OnDiagnosticLogDeletedForCompleteReset(
     bool success) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   const std::vector<base::FilePath> paths = {
-    ledger_state_path_,
-    publisher_state_path_,
-    publisher_info_db_path_,
-    publisher_list_path_,
+      legacy_state_path_,
+      publisher_state_path_,
+      publisher_info_db_path_,
+      publisher_list_path_,
   };
   file_task_runner_->PostTaskAndReplyWithResult(
       FROM_HERE, base::BindOnce(&DeleteFilesOnFileTaskRunner, paths),
@@ -1422,11 +1421,11 @@ void RewardsServiceImpl::Reset() {
   }
 
   current_media_fetchers_.clear();
-  ledger_.reset();
+  engine_.reset();
   receiver_.reset();
-  ledger_factory_.reset();
+  engine_factory_.reset();
   ready_ = std::make_unique<base::OneShotEvent>();
-  ledger_database_.Reset();
+  rewards_database_.Reset();
   BLOG(1, "Successfully reset rewards service");
 }
 
@@ -1544,7 +1543,7 @@ void RewardsServiceImpl::GetPublisherMinVisitTime(
     return DeferCallback(FROM_HERE, std::move(callback), 0);
   }
 
-  ledger_->GetPublisherMinVisitTime(std::move(callback));
+  engine_->GetPublisherMinVisitTime(std::move(callback));
 }
 
 void RewardsServiceImpl::SetPublisherMinVisitTime(
@@ -1553,7 +1552,7 @@ void RewardsServiceImpl::SetPublisherMinVisitTime(
     return;
   }
 
-  ledger_->SetPublisherMinVisitTime(duration_in_seconds);
+  engine_->SetPublisherMinVisitTime(duration_in_seconds);
 }
 
 void RewardsServiceImpl::GetPublisherMinVisits(
@@ -1562,7 +1561,7 @@ void RewardsServiceImpl::GetPublisherMinVisits(
     return DeferCallback(FROM_HERE, std::move(callback), 0);
   }
 
-  ledger_->GetPublisherMinVisits(std::move(callback));
+  engine_->GetPublisherMinVisits(std::move(callback));
 }
 
 void RewardsServiceImpl::SetPublisherMinVisits(int visits) const {
@@ -1570,7 +1569,7 @@ void RewardsServiceImpl::SetPublisherMinVisits(int visits) const {
     return;
   }
 
-  ledger_->SetPublisherMinVisits(visits);
+  engine_->SetPublisherMinVisits(visits);
 }
 
 void RewardsServiceImpl::SetAutoContributionAmount(const double amount) const {
@@ -1578,7 +1577,7 @@ void RewardsServiceImpl::SetAutoContributionAmount(const double amount) const {
     return;
   }
 
-  ledger_->SetAutoContributionAmount(amount);
+  engine_->SetAutoContributionAmount(amount);
 }
 
 void RewardsServiceImpl::GetAutoContributeEnabled(
@@ -1587,7 +1586,7 @@ void RewardsServiceImpl::GetAutoContributeEnabled(
     return DeferCallback(FROM_HERE, std::move(callback), false);
   }
 
-  ledger_->GetAutoContributeEnabled(std::move(callback));
+  engine_->GetAutoContributeEnabled(std::move(callback));
 }
 
 void RewardsServiceImpl::SetAutoContributeEnabled(bool enabled) {
@@ -1595,7 +1594,7 @@ void RewardsServiceImpl::SetAutoContributeEnabled(bool enabled) {
     return;
   }
 
-  ledger_->SetAutoContributeEnabled(enabled);
+  engine_->SetAutoContributeEnabled(enabled);
 }
 
 void RewardsServiceImpl::OnGetBalanceReport(
@@ -1610,11 +1609,11 @@ void RewardsServiceImpl::GetBalanceReport(
     const uint32_t year,
     GetBalanceReportCallback callback) {
   if (!Connected()) {
-    return DeferCallback(FROM_HERE, std::move(callback),
-                         mojom::Result::LEDGER_OK, nullptr);
+    return DeferCallback(FROM_HERE, std::move(callback), mojom::Result::OK,
+                         nullptr);
   }
 
-  ledger_->GetBalanceReport(
+  engine_->GetBalanceReport(
       static_cast<mojom::ActivityMonth>(month), year,
       base::BindOnce(&RewardsServiceImpl::OnGetBalanceReport, AsWeakPtr(),
                      std::move(callback)));
@@ -1649,15 +1648,14 @@ void RewardsServiceImpl::GetPublisherActivityFromUrl(
   visit_data->url = parsed_url.scheme() + "://" + *publisher_domain + "/";
   visit_data->favicon_url = favicon_url;
 
-  ledger_->GetPublisherActivityFromUrl(windowId, std::move(visit_data),
+  engine_->GetPublisherActivityFromUrl(windowId, std::move(visit_data),
                                        publisher_blob);
 }
 
 void RewardsServiceImpl::OnPanelPublisherInfo(mojom::Result result,
                                               mojom::PublisherInfoPtr info,
                                               uint64_t windowId) {
-  if (result != mojom::Result::LEDGER_OK &&
-      result != mojom::Result::NOT_FOUND) {
+  if (result != mojom::Result::OK && result != mojom::Result::NOT_FOUND) {
     return;
   }
 
@@ -1674,7 +1672,7 @@ void RewardsServiceImpl::GetAutoContributionAmount(
     return DeferCallback(FROM_HERE, std::move(callback), 0);
   }
 
-  ledger_->GetAutoContributionAmount(std::move(callback));
+  engine_->GetAutoContributionAmount(std::move(callback));
 }
 
 void RewardsServiceImpl::FetchFavIcon(const std::string& url,
@@ -1749,7 +1747,7 @@ void RewardsServiceImpl::GetPublisherBanner(
     return DeferCallback(FROM_HERE, std::move(callback), nullptr);
   }
 
-  ledger_->GetPublisherBanner(
+  engine_->GetPublisherBanner(
       publisher_id, base::BindOnce(&RewardsServiceImpl::OnPublisherBanner,
                                    AsWeakPtr(), std::move(callback)));
 }
@@ -1762,7 +1760,7 @@ void RewardsServiceImpl::OnPublisherBanner(GetPublisherBannerCallback callback,
 void RewardsServiceImpl::OnSaveRecurringTip(OnTipCallback callback,
                                             mojom::Result result) {
   for (auto& observer : observers_) {
-    observer.OnRecurringTipSaved(this, result == mojom::Result::LEDGER_OK);
+    observer.OnRecurringTipSaved(this, result == mojom::Result::OK);
   }
 
   std::move(callback).Run(result);
@@ -1772,8 +1770,7 @@ void RewardsServiceImpl::SaveRecurringTip(const std::string& publisher_key,
                                           double amount,
                                           OnTipCallback callback) {
   if (!Connected()) {
-    return DeferCallback(FROM_HERE, std::move(callback),
-                         mojom::Result::LEDGER_ERROR);
+    return DeferCallback(FROM_HERE, std::move(callback), mojom::Result::FAILED);
   }
 
   mojom::RecurringTipPtr info = mojom::RecurringTip::New();
@@ -1781,7 +1778,7 @@ void RewardsServiceImpl::SaveRecurringTip(const std::string& publisher_key,
   info->amount = amount;
   info->created_at = GetCurrentTimestamp();
 
-  ledger_->SaveRecurringTip(
+  engine_->SaveRecurringTip(
       std::move(info), base::BindOnce(&RewardsServiceImpl::OnSaveRecurringTip,
                                       AsWeakPtr(), std::move(callback)));
 }
@@ -1795,7 +1792,7 @@ void RewardsServiceImpl::SendContribution(
     return DeferCallback(FROM_HERE, std::move(callback), false);
   }
 
-  ledger_->SendContribution(
+  engine_->SendContribution(
       publisher_key, amount, set_monthly,
       base::BindOnce(&RewardsServiceImpl::OnContributionSent, AsWeakPtr(),
                      set_monthly, std::move(callback)));
@@ -1825,7 +1822,7 @@ void RewardsServiceImpl::UpdateMediaDuration(
     return;
   }
 
-  ledger_->UpdateMediaDuration(window_id, publisher_key, duration, first_visit);
+  engine_->UpdateMediaDuration(window_id, publisher_key, duration, first_visit);
 }
 
 void RewardsServiceImpl::IsPublisherRegistered(
@@ -1835,29 +1832,29 @@ void RewardsServiceImpl::IsPublisherRegistered(
     return DeferCallback(FROM_HERE, std::move(callback), false);
   }
 
-  ledger_->IsPublisherRegistered(publisher_id, std::move(callback));
+  engine_->IsPublisherRegistered(publisher_id, std::move(callback));
 }
 
 void RewardsServiceImpl::GetPublisherInfo(
     const std::string& publisher_key,
     GetPublisherInfoCallback callback) {
   if (!Connected()) {
-    return DeferCallback(FROM_HERE, std::move(callback),
-                         mojom::Result::LEDGER_ERROR, nullptr);
+    return DeferCallback(FROM_HERE, std::move(callback), mojom::Result::FAILED,
+                         nullptr);
   }
 
-  ledger_->GetPublisherInfo(publisher_key, std::move(callback));
+  engine_->GetPublisherInfo(publisher_key, std::move(callback));
 }
 
 void RewardsServiceImpl::GetPublisherPanelInfo(
     const std::string& publisher_key,
     GetPublisherInfoCallback callback) {
   if (!Connected()) {
-    return DeferCallback(FROM_HERE, std::move(callback),
-                         mojom::Result::LEDGER_ERROR, nullptr);
+    return DeferCallback(FROM_HERE, std::move(callback), mojom::Result::FAILED,
+                         nullptr);
   }
 
-  ledger_->GetPublisherPanelInfo(publisher_key, std::move(callback));
+  engine_->GetPublisherPanelInfo(publisher_key, std::move(callback));
 }
 
 void RewardsServiceImpl::SavePublisherInfo(
@@ -1865,11 +1862,10 @@ void RewardsServiceImpl::SavePublisherInfo(
     mojom::PublisherInfoPtr publisher_info,
     SavePublisherInfoCallback callback) {
   if (!Connected()) {
-    return DeferCallback(FROM_HERE, std::move(callback),
-                         mojom::Result::LEDGER_ERROR);
+    return DeferCallback(FROM_HERE, std::move(callback), mojom::Result::FAILED);
   }
 
-  ledger_->SavePublisherInfo(window_id, std::move(publisher_info),
+  engine_->SavePublisherInfo(window_id, std::move(publisher_info),
                              std::move(callback));
 }
 
@@ -1880,7 +1876,7 @@ void RewardsServiceImpl::GetRecurringTips(
                          std::vector<mojom::PublisherInfoPtr>());
   }
 
-  ledger_->GetRecurringTips(std::move(callback));
+  engine_->GetRecurringTips(std::move(callback));
 }
 
 void RewardsServiceImpl::GetOneTimeTips(GetOneTimeTipsCallback callback) {
@@ -1889,11 +1885,11 @@ void RewardsServiceImpl::GetOneTimeTips(GetOneTimeTipsCallback callback) {
                          std::vector<mojom::PublisherInfoPtr>());
   }
 
-  ledger_->GetOneTimeTips(std::move(callback));
+  engine_->GetOneTimeTips(std::move(callback));
 }
 
 void RewardsServiceImpl::OnRecurringTip(const mojom::Result result) {
-  bool success = result == mojom::Result::LEDGER_OK;
+  bool success = result == mojom::Result::OK;
   for (auto& observer : observers_) {
     observer.OnRecurringTipRemoved(this, success);
   }
@@ -1905,7 +1901,7 @@ void RewardsServiceImpl::RemoveRecurringTip(
     return;
   }
 
-  ledger_->RemoveRecurringTip(
+  engine_->RemoveRecurringTip(
       publisher_key,
       base::BindOnce(&RewardsServiceImpl::OnRecurringTip, AsWeakPtr()));
 }
@@ -1913,7 +1909,7 @@ void RewardsServiceImpl::RemoveRecurringTip(
 void RewardsServiceImpl::OnSetPublisherExclude(const std::string& publisher_key,
                                                const bool exclude,
                                                const mojom::Result result) {
-  if (result != mojom::Result::LEDGER_OK) {
+  if (result != mojom::Result::OK) {
     return;
   }
 
@@ -1932,7 +1928,7 @@ void RewardsServiceImpl::SetPublisherExclude(
   mojom::PublisherExclude status = exclude ? mojom::PublisherExclude::EXCLUDED
                                            : mojom::PublisherExclude::INCLUDED;
 
-  ledger_->SetPublisherExclude(
+  engine_->SetPublisherExclude(
       publisher_key, status,
       base::BindOnce(&RewardsServiceImpl::OnSetPublisherExclude, AsWeakPtr(),
                      publisher_key, exclude));
@@ -1997,7 +1993,7 @@ void RewardsServiceImpl::WriteDiagnosticLog(const std::string& file,
                                             const int line,
                                             const int verbose_level,
                                             const std::string& message) {
-  if (ledger_for_testing_ || resetting_rewards_) {
+  if (engine_for_testing_ || resetting_rewards_) {
     return;
   }
 
@@ -2090,7 +2086,7 @@ void RewardsServiceImpl::GetRewardsInternalsInfo(
     return DeferCallback(FROM_HERE, std::move(callback), nullptr);
   }
 
-  ledger_->GetRewardsInternalsInfo(std::move(callback));
+  engine_->GetRewardsInternalsInfo(std::move(callback));
 }
 
 void RewardsServiceImpl::OnTip(const std::string& publisher_key,
@@ -2098,8 +2094,7 @@ void RewardsServiceImpl::OnTip(const std::string& publisher_key,
                                bool recurring,
                                OnTipCallback callback) {
   if (!Connected()) {
-    return DeferCallback(FROM_HERE, std::move(callback),
-                         mojom::Result::LEDGER_ERROR);
+    return DeferCallback(FROM_HERE, std::move(callback), mojom::Result::FAILED);
   }
 
   RecordBackendP3AStats(/*delay_report*/ true);
@@ -2108,34 +2103,34 @@ void RewardsServiceImpl::OnTip(const std::string& publisher_key,
     return SaveRecurringTip(publisher_key, amount, std::move(callback));
   }
 
-  ledger_->OneTimeTip(publisher_key, amount, std::move(callback));
+  engine_->OneTimeTip(publisher_key, amount, std::move(callback));
 }
 
 bool RewardsServiceImpl::Connected() const {
-  return ledger_.is_bound();
+  return engine_.is_bound();
 }
 
 void RewardsServiceImpl::StartProcessForTesting(base::OnceClosure callback) {
   ready_->Post(FROM_HERE, std::move(callback));
-  StartLedgerProcessIfNecessary();
+  StartEngineProcessIfNecessary();
 }
 
-void RewardsServiceImpl::SetLedgerEnvForTesting() {
-  ledger_for_testing_ = true;
+void RewardsServiceImpl::SetEngineEnvForTesting() {
+  engine_for_testing_ = true;
 }
 
-void RewardsServiceImpl::SetLedgerStateTargetVersionForTesting(int version) {
-  ledger_state_target_version_for_testing_ = version;
+void RewardsServiceImpl::SetEngineStateTargetVersionForTesting(int version) {
+  engine_state_target_version_for_testing_ = version;
 }
 
-void RewardsServiceImpl::PrepareLedgerEnvForTesting() {
-  if (!ledger_for_testing_ || !Connected()) {
+void RewardsServiceImpl::PrepareEngineEnvForTesting() {
+  if (!engine_for_testing_ || !Connected()) {
     return;
   }
 
-  ledger_->SetTesting();
-  ledger_->SetStateMigrationTargetVersionForTesting(  // IN-TEST
-      ledger_state_target_version_for_testing_);
+  engine_->SetTesting();
+  engine_->SetStateMigrationTargetVersionForTesting(  // IN-TEST
+      engine_state_target_version_for_testing_);
   SetRetryInterval(1);
 
   profile_->GetPrefs()->SetInteger(prefs::kMinVisitTime, 1);
@@ -2146,7 +2141,7 @@ void RewardsServiceImpl::StartContributionsForTesting() {
     return;
   }
 
-  ledger_->StartContributionsForTesting();  // IN-TEST
+  engine_->StartContributionsForTesting();  // IN-TEST
 }
 
 void RewardsServiceImpl::GetEnvironment(GetEnvironmentCallback callback) {
@@ -2154,7 +2149,7 @@ void RewardsServiceImpl::GetEnvironment(GetEnvironmentCallback callback) {
     return DeferCallback(FROM_HERE, std::move(callback),
                          GetDefaultServerEnvironment());
   }
-  ledger_->GetEnvironment(std::move(callback));
+  engine_->GetEnvironment(std::move(callback));
 }
 
 p3a::ConversionMonitor* RewardsServiceImpl::GetP3AConversionMonitor() {
@@ -2165,7 +2160,7 @@ void RewardsServiceImpl::GetDebug(GetDebugCallback callback) {
   if (!Connected()) {
     return;
   }
-  ledger_->GetDebug(std::move(callback));
+  engine_->GetDebug(std::move(callback));
 }
 
 void RewardsServiceImpl::GetReconcileInterval(
@@ -2173,42 +2168,42 @@ void RewardsServiceImpl::GetReconcileInterval(
   if (!Connected()) {
     return;
   }
-  ledger_->GetReconcileInterval(std::move(callback));
+  engine_->GetReconcileInterval(std::move(callback));
 }
 
 void RewardsServiceImpl::GetRetryInterval(GetRetryIntervalCallback callback) {
   if (!Connected()) {
     return;
   }
-  ledger_->GetRetryInterval(std::move(callback));
+  engine_->GetRetryInterval(std::move(callback));
 }
 
 void RewardsServiceImpl::SetEnvironment(mojom::Environment environment) {
   if (!Connected()) {
     return;
   }
-  ledger_->SetEnvironment(environment);
+  engine_->SetEnvironment(environment);
 }
 
 void RewardsServiceImpl::SetDebug(bool debug) {
   if (!Connected()) {
     return;
   }
-  ledger_->SetDebug(debug);
+  engine_->SetDebug(debug);
 }
 
 void RewardsServiceImpl::SetReconcileInterval(const int32_t interval) {
   if (!Connected()) {
     return;
   }
-  ledger_->SetReconcileInterval(interval);
+  engine_->SetReconcileInterval(interval);
 }
 
 void RewardsServiceImpl::SetRetryInterval(int32_t interval) {
   if (!Connected()) {
     return;
   }
-  ledger_->SetRetryInterval(interval);
+  engine_->SetRetryInterval(interval);
 }
 
 void RewardsServiceImpl::PublisherListNormalized(
@@ -2243,7 +2238,7 @@ void RewardsServiceImpl::RefreshPublisher(
     return DeferCallback(FROM_HERE, std::move(callback),
                          mojom::PublisherStatus::NOT_VERIFIED, "");
   }
-  ledger_->RefreshPublisher(
+  engine_->RefreshPublisher(
       publisher_key,
       base::BindOnce(&RewardsServiceImpl::OnRefreshPublisher, AsWeakPtr(),
                      std::move(callback), publisher_key));
@@ -2268,7 +2263,7 @@ void RewardsServiceImpl::SetInlineTippingPlatformEnabled(
   }
 
   const auto platform = ConvertInlineTipStringToPlatform(key);
-  ledger_->SetInlineTippingPlatformEnabled(platform, enabled);
+  engine_->SetInlineTippingPlatformEnabled(platform, enabled);
 }
 
 void RewardsServiceImpl::GetInlineTippingPlatformEnabled(
@@ -2279,7 +2274,7 @@ void RewardsServiceImpl::GetInlineTippingPlatformEnabled(
   }
 
   const auto platform = ConvertInlineTipStringToPlatform(key);
-  ledger_->GetInlineTippingPlatformEnabled(platform, std::move(callback));
+  engine_->GetInlineTippingPlatformEnabled(platform, std::move(callback));
 }
 
 void RewardsServiceImpl::GetShareURL(
@@ -2289,7 +2284,7 @@ void RewardsServiceImpl::GetShareURL(
     return DeferCallback(FROM_HERE, std::move(callback), "");
   }
 
-  ledger_->GetShareURL(args, std::move(callback));
+  engine_->GetShareURL(args, std::move(callback));
 }
 
 void RewardsServiceImpl::FetchBalance(FetchBalanceCallback callback) {
@@ -2299,7 +2294,7 @@ void RewardsServiceImpl::FetchBalance(FetchBalanceCallback callback) {
         base::unexpected(mojom::FetchBalanceError::kUnexpected));
   }
 
-  ledger_->FetchBalance(std::move(callback));
+  engine_->FetchBalance(std::move(callback));
 }
 
 bool RewardsServiceImpl::IsAutoContributeSupported() const {
@@ -2325,7 +2320,7 @@ void RewardsServiceImpl::GetExternalWallet(GetExternalWalletCallback callback) {
         base::unexpected(mojom::GetExternalWalletError::kUnexpected));
   }
 
-  ledger_->GetExternalWallet(GetExternalWalletType(), std::move(callback));
+  engine_->GetExternalWallet(GetExternalWalletType(), std::move(callback));
 }
 
 void RewardsServiceImpl::ConnectExternalWallet(
@@ -2364,7 +2359,7 @@ void RewardsServiceImpl::ConnectExternalWallet(
         it.GetUnescapedValue();
   }
 
-  ledger_->ConnectExternalWallet(wallet_type, query_parameters,
+  engine_->ConnectExternalWallet(wallet_type, query_parameters,
                                  std::move(inner_callback));
 }
 
@@ -2372,7 +2367,7 @@ void RewardsServiceImpl::ShowNotification(const std::string& type,
                                           const std::vector<std::string>& args,
                                           ShowNotificationCallback callback) {
   if (type.empty()) {
-    std::move(callback).Run(mojom::Result::LEDGER_ERROR);
+    std::move(callback).Run(mojom::Result::FAILED);
     return;
   }
 
@@ -2380,11 +2375,10 @@ void RewardsServiceImpl::ShowNotification(const std::string& type,
   notification_args.push_back(type);
   notification_args.insert(notification_args.end(), args.begin(), args.end());
   notification_service_->AddNotification(
-      RewardsNotificationService::REWARDS_NOTIFICATION_GENERAL_LEDGER,
-      notification_args,
-      "rewards_notification_general_ledger_" + type);
+      RewardsNotificationService::REWARDS_NOTIFICATION_GENERAL,
+      notification_args, "rewards_notification_general_" + type);
 
-  std::move(callback).Run(mojom::Result::LEDGER_OK);
+  std::move(callback).Run(mojom::Result::OK);
 }
 
 void RewardsServiceImpl::RecordBackendP3AStats(bool delay_report) {
@@ -2435,7 +2429,7 @@ void RewardsServiceImpl::GetAllContributionsForP3A() {
     return;
   }
 
-  ledger_->GetAllContributions(base::BindOnce(
+  engine_->GetAllContributions(base::BindOnce(
       &RewardsServiceImpl::OnRecordBackendP3AStatsContributions, AsWeakPtr()));
 }
 
@@ -2529,7 +2523,7 @@ void RewardsServiceImpl::GetMonthlyReport(
     return DeferCallback(FROM_HERE, std::move(callback), nullptr);
   }
 
-  ledger_->GetMonthlyReport(
+  engine_->GetMonthlyReport(
       static_cast<mojom::ActivityMonth>(month), year,
       base::BindOnce(&RewardsServiceImpl::OnGetMonthlyReport, AsWeakPtr(),
                      std::move(callback)));
@@ -2550,8 +2544,8 @@ void RewardsServiceImpl::ReconcileStampReset() {
 
 void RewardsServiceImpl::RunDBTransaction(mojom::DBTransactionPtr transaction,
                                           RunDBTransactionCallback callback) {
-  DCHECK(ledger_database_);
-  ledger_database_.AsyncCall(&internal::LedgerDatabase::RunTransaction)
+  DCHECK(rewards_database_);
+  rewards_database_.AsyncCall(&internal::RewardsDatabase::RunTransaction)
       .WithArgs(std::move(transaction))
       .Then(base::BindOnce(&RewardsServiceImpl::OnRunDBTransaction, AsWeakPtr(),
                            std::move(callback)));
@@ -2576,7 +2570,7 @@ void RewardsServiceImpl::GetAllMonthlyReportIds(
                          std::vector<std::string>());
   }
 
-  ledger_->GetAllMonthlyReportIds(std::move(callback));
+  engine_->GetAllMonthlyReportIds(std::move(callback));
 }
 
 void RewardsServiceImpl::GetAllContributions(
@@ -2586,7 +2580,7 @@ void RewardsServiceImpl::GetAllContributions(
                          std::vector<mojom::ContributionInfoPtr>());
   }
 
-  ledger_->GetAllContributions(std::move(callback));
+  engine_->GetAllContributions(std::move(callback));
 }
 
 void RewardsServiceImpl::GetAllPromotions(GetAllPromotionsCallback callback) {
@@ -2595,7 +2589,7 @@ void RewardsServiceImpl::GetAllPromotions(GetAllPromotionsCallback callback) {
                          std::vector<mojom::PromotionPtr>());
   }
 
-  ledger_->GetAllPromotions(
+  engine_->GetAllPromotions(
       base::BindOnce(&RewardsServiceImpl::OnGetAllPromotions, AsWeakPtr(),
                      std::move(callback)));
 }
@@ -2624,11 +2618,9 @@ void RewardsServiceImpl::CompleteReset(SuccessCallback callback) {
   notification_service_->DeleteAllNotifications(true);
 
   auto stop_callback =
-      base::BindOnce(
-          &RewardsServiceImpl::OnStopLedgerForCompleteReset,
-          AsWeakPtr(),
-          std::move(callback));
-  StopLedger(std::move(stop_callback));
+      base::BindOnce(&RewardsServiceImpl::OnStopEngineForCompleteReset,
+                     AsWeakPtr(), std::move(callback));
+  StopEngine(std::move(stop_callback));
 }
 
 void RewardsServiceImpl::OnFilesDeletedForCompleteReset(
@@ -2668,8 +2660,7 @@ void RewardsServiceImpl::DeleteLog(DeleteLogCallback callback) {
 
 void RewardsServiceImpl::OnDiagnosticLogDeleted(DeleteLogCallback callback,
                                                 bool success) {
-  const auto result =
-      success ? mojom::Result::LEDGER_OK : mojom::Result::LEDGER_ERROR;
+  const auto result = success ? mojom::Result::OK : mojom::Result::FAILED;
   std::move(callback).Run(result);
 }
 
@@ -2679,7 +2670,7 @@ void RewardsServiceImpl::GetEventLogs(GetEventLogsCallback callback) {
                          std::vector<mojom::EventLogPtr>());
   }
 
-  ledger_->GetEventLogs(std::move(callback));
+  engine_->GetEventLogs(std::move(callback));
 }
 
 void RewardsServiceImpl::EncryptString(const std::string& value,
@@ -2707,7 +2698,7 @@ void RewardsServiceImpl::GetRewardsWallet(GetRewardsWalletCallback callback) {
     return DeferCallback(FROM_HERE, std::move(callback), nullptr);
   }
 
-  ledger_->GetRewardsWallet(std::move(callback));
+  engine_->GetRewardsWallet(std::move(callback));
 }
 
 bool RewardsServiceImpl::IsBitFlyerCountry() const {
