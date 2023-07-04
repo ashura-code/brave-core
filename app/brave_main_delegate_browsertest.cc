@@ -234,7 +234,6 @@ IN_PROC_BROWSER_TEST_F(BraveMainDelegateBrowserTest, DisabledFeatures) {
     &segmentation_platform::features::kSegmentationPlatformFeature,
     &send_tab_to_self::kSendTabToSelfSigninPromo,
     &shared_highlighting::kIOSSharedHighlightingV2,
-    &shared_highlighting::kSharedHighlightingAmp,
     &subresource_filter::kAdTagging,
 #if !BUILDFLAG(IS_ANDROID)
     &translate::kTFLiteLanguageDetectionEnabled,
