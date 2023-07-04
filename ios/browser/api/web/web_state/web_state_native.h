@@ -43,7 +43,6 @@ class NativeWebState final {
 
   Browser* browser_;
   SessionID session_id_;
-  std::unique_ptr<NavigationDelegate> navigation_delegate_;
   web::WebState* web_state_;
   std::unique_ptr<Observer> web_state_observer_;
 };
