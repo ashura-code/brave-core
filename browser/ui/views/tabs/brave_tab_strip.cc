@@ -75,8 +75,8 @@ bool BraveTabStrip::IsVerticalTabsFloating() const {
 
 bool BraveTabStrip::ShouldDrawStrokes() const {
   if (ShouldShowVerticalTabs()) {
-    // Prevent root view from drawing lines. For tabs, we're overriding
-    // GetStrokeThickness().
+    // Prevent root view from drawing lines. For vertical tabs stroke , we
+    // ignore this method and always draw strokes in GetStrokeThickness().
     return false;
   }
 
@@ -172,21 +172,6 @@ void BraveTabStrip::AddedToWidget() {
                                   base::Unretained(this)));
   }
 }
-
-// SkColor BraveTabStrip::GetTabBackgroundColor(
-//     TabActive active,
-//     BrowserFrameActiveState active_state) const {
-//   if (!ShouldShowVerticalTabs())
-//     return TabStrip::GetTabBackgroundColor(active, active_state);
-
-//   const ui::ColorProvider* cp = GetColorProvider();
-//   if (!cp)
-//     return gfx::kPlaceholderColor;
-
-//   return cp->GetColor(active == TabActive::kActive
-//                           ? kColorBraveVerticalTabActiveBackground
-//                           : kColorBraveVerticalTabInactiveBackground);
-// }
 
 SkColor BraveTabStrip::GetTabSeparatorColor() const {
   if (ShouldShowVerticalTabs())
