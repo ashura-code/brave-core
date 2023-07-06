@@ -55,7 +55,7 @@ public class RewardsOnboarding implements BraveRewardsObserver {
     private ViewGroup mAllSetLayout;
     private ViewGroup mErrorLayout;
 
-    private Button mContinueButton;
+    private TextView mContinueButton;
 
     private BraveRewardsNativeWorker mBraveRewardsNativeWorker;
 
