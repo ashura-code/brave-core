@@ -1,5 +1,5 @@
 diff --git a/build/rust/run_build_script.py b/build/rust/run_build_script.py
-index 3f99f3af9b0b68f600c3f32f49e276eb1308fece..7bca6e209b21fe9668abb50f1ad281a8d3d0b28d 100755
+index fe8eb107cd720ade5af9bed7e99f817565d23a8c..27f93d9b9c3936a0096c6b7bf35b59e8dc9aab99 100755
 --- a/build/rust/run_build_script.py
 +++ b/build/rust/run_build_script.py
 @@ -101,11 +101,12 @@ def main():

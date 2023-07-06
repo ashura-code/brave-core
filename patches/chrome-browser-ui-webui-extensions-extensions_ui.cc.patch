@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/webui/extensions/extensions_ui.cc b/chrome/browser/ui/webui/extensions/extensions_ui.cc
-index e7abdf55abaf79904201886cec4efe2cb24f2ad0..8444faf4f4580343fe27682cbd4c2035815f3904 100644
+index 0d934929aa46f79ad5462690bedaddc2e62eb4f7..a4b5335a3f61220c03ce5858e4703d32b4672da8 100644
 --- a/chrome/browser/ui/webui/extensions/extensions_ui.cc
 +++ b/chrome/browser/ui/webui/extensions/extensions_ui.cc
-@@ -421,6 +421,7 @@ content::WebUIDataSource* CreateAndAddExtensionsSource(Profile* profile,
+@@ -422,6 +422,7 @@ content::WebUIDataSource* CreateAndAddExtensionsSource(Profile* profile,
        "safetyCheckShowReviewPanel",
        base::FeatureList::IsEnabled(features::kSafetyCheckExtensions));
  

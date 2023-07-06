@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/tabs/new_tab_button.h b/chrome/browser/ui/views/tabs/new_tab_button.h
-index 6f882fa3f2a81d52408499fc4d12453428e63fd7..fe6405971c097ef23d9aad6e474fe85dd6ccdce8 100644
+index 6f307b2d37eb079b5a563953aaa0271925bfddc9..018e36c7acc36c5152b43881d126a8d46a84d0d9 100644
 --- a/chrome/browser/ui/views/tabs/new_tab_button.h
 +++ b/chrome/browser/ui/views/tabs/new_tab_button.h
 @@ -49,6 +49,7 @@ class NewTabButton : public views::ImageButton,

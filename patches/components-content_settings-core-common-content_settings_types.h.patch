@@ -1,8 +1,8 @@
 diff --git a/components/content_settings/core/common/content_settings_types.h b/components/content_settings/core/common/content_settings_types.h
-index e238be9d538dd257f74101c413cbb69cf04f39f5..fdede737f382949a667b56301edaf618af09f2db 100644
+index 47518a3bb3aa139ef9a39b53157cd5c8d7977744..575e10a069ab9557a9acf903150df29df9879de2 100644
 --- a/components/content_settings/core/common/content_settings_types.h
 +++ b/components/content_settings/core/common/content_settings_types.h
-@@ -331,6 +331,22 @@ enum class ContentSettingsType : int32_t {
+@@ -337,6 +337,22 @@ enum class ContentSettingsType : int32_t {
    // https://github.com/screen-share/capture-all-screens
    ALL_SCREEN_CAPTURE,
  

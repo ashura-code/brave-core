@@ -1,5 +1,5 @@
 diff --git a/components/sync/engine/model_type_worker.h b/components/sync/engine/model_type_worker.h
-index cb78cb60db3a77aecca94edba4569372b0406ed3..2343005a548ddff0f5c1bf4c26ade696c389d44a 100644
+index a398bab39420b87f3bda8810202806590bf78fd7..332f98b87462dc12f5f80f74b847565679e98273 100644
 --- a/components/sync/engine/model_type_worker.h
 +++ b/components/sync/engine/model_type_worker.h
 @@ -207,6 +207,7 @@ class ModelTypeWorker : public UpdateHandler,

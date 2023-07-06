@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
-index e36b5a4d6d8d093bc1f13c3df3cb404562149617..72ab52e266a232aabe71b9036d77d68bd94f2886 100644
+index 485c68827df1bb7f7621b82b7318eb0b18bfc894..23c29663baabc709903c6749c83fcad2c9db9ce5 100644
 --- a/chrome/browser/app_controller_mac.mm
 +++ b/chrome/browser/app_controller_mac.mm
-@@ -1187,7 +1187,7 @@ class AppControllerNativeThemeObserver : public ui::NativeThemeObserver {
+@@ -1189,7 +1189,7 @@ class AppControllerNativeThemeObserver : public ui::NativeThemeObserver {
    }
  
    auto it = _profileBookmarkMenuBridgeMap.find(profilePath);
