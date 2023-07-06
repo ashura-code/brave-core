@@ -13,6 +13,7 @@
 #include "base/scoped_observation.h"
 #include "brave/components/sidebar/sidebar_item.h"
 #include "brave/components/sidebar/sidebar_service.h"
+#include "chrome/browser/ui/side_panel/side_panel_entry_key.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/base/window_open_disposition.h"
@@ -68,6 +69,9 @@ class SidebarController : public SidebarService::Observer,
 
   bool IsActiveIndex(absl::optional<size_t> index) const;
 
+  void SetBrowserActivePanelKey(
+      absl::optional<SidePanelEntryKey> entry_key = absl::nullopt);
+
   // Give value and reset.
   bool IsPanelOperationFromActiveTabChange();
 
@@ -106,6 +110,9 @@ class SidebarController : public SidebarService::Observer,
   // when changing active tab to a tab without a tab-specific panel open.
   absl::optional<SidebarItem::BuiltInItemType> browser_active_panel_type_ =
       absl::nullopt;
+
+  // TODO(simonhong): Unify |browser_active_panel_type_| and this.
+  absl::optional<SidePanelEntryKey> browser_active_panel_key_;
 
   // True if panel opening/closing request from active tab change.
   bool operation_from_active_tab_change_ = false;

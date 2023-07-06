@@ -589,12 +589,14 @@ void SidebarContainerView::OnEntryShown(SidePanelEntry* entry) {
   // as well as Sidebar as there are other ways than Sidebar for SidePanel
   // items to be shown and hidden, e.g. toolbar button.
   DVLOG(1) << "Panel shown: " << entry->name();
+  auto* controller = browser_->sidebar_controller();
 
   // Handling side panel extension till we have item for it.
   if (entry->key().extension_id()) {
     // If side panel is shown by side panel extension, showing should
     // be done here because side panel extension is not controlled by our
     // sidebar model.
+    controller->SetBrowserActivePanelKey(entry->key());
     ShowSidebar(true);
     return;
   }
@@ -605,7 +607,6 @@ void SidebarContainerView::OnEntryShown(SidePanelEntry* entry) {
     }
     if (entry->key().id() == sidebar::SidePanelIdFromSideBarItem(item)) {
       auto side_bar_index = sidebar_model_->GetIndexOf(item);
-      auto* controller = browser_->sidebar_controller();
       controller->ActivateItemAt(side_bar_index);
       break;
     }
@@ -615,13 +616,16 @@ void SidebarContainerView::OnEntryShown(SidePanelEntry* entry) {
 void SidebarContainerView::OnEntryHidden(SidePanelEntry* entry) {
   // Make sure item is deselected
   DVLOG(1) << "Panel hidden: " << entry->name();
+  auto* controller = browser_->sidebar_controller();
 
-  if (entry->key().extension_id() &&
-      !side_panel_coordinator_->GetCurrentEntryId()) {
-    // If side panel is closed by togging side panel extension, hiding should
-    // be done here because side panel extension is not controlled by our
-    // sidebar model.
-    HideSidebarForShowOption();
+  if (entry->key().extension_id()) {
+    if (!side_panel_coordinator_->GetCurrentEntryId()) {
+      // If side panel is closed by togging side panel extension, hiding should
+      // be done here because side panel extension is not controlled by our
+      // sidebar model.
+      controller->SetBrowserActivePanelKey();
+      HideSidebarForShowOption();
+    }
     return;
   }
 
@@ -632,7 +636,6 @@ void SidebarContainerView::OnEntryHidden(SidePanelEntry* entry) {
 
     if (entry->key().id() == sidebar::SidePanelIdFromSideBarItem(item)) {
       auto side_bar_index = sidebar_model_->GetIndexOf(item);
-      auto* controller = browser_->sidebar_controller();
       if (controller->IsActiveIndex(side_bar_index)) {
         controller->ActivateItemAt(absl::nullopt);
       }

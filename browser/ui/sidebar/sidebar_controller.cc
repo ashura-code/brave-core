@@ -105,6 +105,12 @@ void SidebarController::ActivateItemAt(absl::optional<size_t> index,
   if (!index) {
     sidebar_model_->SetActiveIndex(index);
     browser_active_panel_type_ = absl::nullopt;
+
+    auto* panel_ui = SidePanelUI::GetSidePanelUIForBrowser(browser_);
+    if (!panel_ui->GetCurrentEntryId()) {
+      browser_active_panel_key_ = absl::nullopt;
+    }
+
     if (helper) {
       // This tab doesn't have a tab-specific panel now
       helper->RegisterPanelInactive();
@@ -190,6 +196,11 @@ bool SidebarController::ActiveTabFromOtherBrowsersForHost(const GURL& url) {
   return false;
 }
 
+void SidebarController::SetBrowserActivePanelKey(
+    absl::optional<SidePanelEntryKey> entry_key) {
+  browser_active_panel_key_ = entry_key;
+}
+
 void SidebarController::IterateOrLoadAtActiveTab(const GURL& url) {
   // Get target tab index
   const auto all_index = GetAllExistingTabIndexForHost(browser_, url.host());
@@ -267,23 +278,15 @@ void SidebarController::OnTabStripModelChanged(
       }
     } else {
       // There is no tab-specific panel for the new active tab
-      if (browser_active_panel_type_.has_value()) {
+      if (browser_active_panel_type_) {
         // - restore previous active index
         ActivatePanelItem(browser_active_panel_type_.value());
+      } else if (browser_active_panel_key_) {
+        panel_ui->Show(browser_active_panel_key_.value());
       } else {
         // - close any tab-specific panel from the previous tab
-        auto current_entry_id = panel_ui->GetCurrentEntryId();
-        // When extension side panel is opened, it's not set to
-        // |browser_active_panel_type_|. We don't call ActivateItemAt() for
-        // extension item as our SidebarModel can't manage it now. Only
-        // tab-specific panel should be closed here if it's used.
-        if (current_entry_id &&
-            (current_entry_id != SidePanelEntryId::kExtension)) {
-          // Open/Close by tab change doesn't need animation.
-          // UI could refer this for preven animation.
-          operation_from_active_tab_change_ = true;
-          panel_ui->Close();
-        }
+        operation_from_active_tab_change_ = true;
+        panel_ui->Close();
       }
     }
   }
