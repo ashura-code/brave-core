@@ -23,14 +23,6 @@
 #include "components/value_store/value_store_task_runner.h"
 #include "url/origin.h"
 
-#if BUILDFLAG(IS_IOS)
-#include "ios/web/public/thread/web_task_traits.h"
-#include "ios/web/public/thread/web_thread.h"
-#else
-#include "content/public/browser/browser_task_traits.h"
-#include "content/public/browser/browser_thread.h"
-#endif  // BUILDFLAG(IS_IOS)
-
 namespace brave_wallet {
 
 namespace {
@@ -65,22 +57,19 @@ size_t CalculatePendingTxCount(
 
 }  // namespace
 
-TxService::TxService(JsonRpcService* json_rpc_service,
-                     BitcoinWalletService* bitcoin_wallet_service,
-                     KeyringService* keyring_service,
-                     PrefService* prefs,
-                     const base::FilePath& context_path)
+TxService::TxService(
+    JsonRpcService* json_rpc_service,
+    BitcoinWalletService* bitcoin_wallet_service,
+    KeyringService* keyring_service,
+    PrefService* prefs,
+    const base::FilePath& context_path,
+    const scoped_refptr<base::SequencedTaskRunner>& ui_task_runner)
     : prefs_(prefs), json_rpc_service_(json_rpc_service), weak_factory_(this) {
   store_factory_ = base::MakeRefCounted<value_store::ValueStoreFactoryImpl>(
       context_path.AppendASCII(kWalletBaseDirectory));
   store_ = std::make_unique<value_store::ValueStoreFrontend>(
       store_factory_, base::FilePath(kWalletStorageName),
-      kValueStoreDatabaseUMAClientName,
-#if BUILDFLAG(IS_IOS)
-      web::GetUIThreadTaskRunner({}),
-#else
-      content::GetUIThreadTaskRunner({}),
-#endif
+      kValueStoreDatabaseUMAClientName, ui_task_runner,
       value_store::GetValueStoreTaskRunner());
 
   TxStateManager::MigrateTransactionsFromPrefsToDB(prefs, store_.get());

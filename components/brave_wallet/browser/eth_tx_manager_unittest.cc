@@ -13,8 +13,10 @@
 
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/callback_helpers.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/task_environment.h"
 #include "base/test/values_test_util.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_constants.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_prefs.h"
@@ -259,9 +261,9 @@ class EthTxManagerUnitTest : public testing::Test {
     keyring_service_ = std::make_unique<KeyringService>(
         json_rpc_service_.get(), &profile_prefs_, &local_state_);
     ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
-    tx_service_ = std::make_unique<TxService>(json_rpc_service_.get(), nullptr,
-                                              keyring_service_.get(),
-                                              GetPrefs(), temp_dir_.GetPath());
+    tx_service_ = std::make_unique<TxService>(
+        json_rpc_service_.get(), nullptr, keyring_service_.get(), GetPrefs(),
+        temp_dir_.GetPath(), base::SequencedTaskRunner::GetCurrentDefault());
 
     keyring_service_->CreateWallet("testing123", base::DoNothing());
     base::RunLoop().RunUntilIdle();
@@ -472,7 +474,7 @@ class EthTxManagerUnitTest : public testing::Test {
 
  protected:
   base::test::ScopedFeatureList feature_list_;
-  content::BrowserTaskEnvironment task_environment_;
+  base::test::TaskEnvironment task_environment_;
   base::ScopedTempDir temp_dir_;
   sync_preferences::TestingPrefServiceSyncable profile_prefs_;
   sync_preferences::TestingPrefServiceSyncable local_state_;

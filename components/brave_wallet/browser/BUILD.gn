@@ -251,12 +251,6 @@ static_library("browser") {
     deps += [ "//brave/components/ipfs" ]
   }
 
-  if (is_ios) {
-    deps += [ "//ios/web/public/thread" ]
-  } else {
-    deps += [ "//content/public/browser" ]
-  }
-
   configs += [ ":sardine_config" ]
 }
 

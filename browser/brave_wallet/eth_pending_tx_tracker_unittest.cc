@@ -70,12 +70,12 @@ class EthPendingTxTrackerUnitTest : public testing::Test {
   void WaitForResponse() { task_environment_.RunUntilIdle(); }
 
  protected:
-  content::BrowserTaskEnvironment task_environment_;
   std::unique_ptr<EthTxStateManager> tx_state_manager_;
 
  private:
   network::TestURLLoaderFactory url_loader_factory_;
   scoped_refptr<network::SharedURLLoaderFactory> shared_url_loader_factory_;
+  content::BrowserTaskEnvironment task_environment_;
   base::ScopedTempDir temp_dir_;
   scoped_refptr<value_store::TestValueStoreFactory> factory_;
   std::unique_ptr<value_store::ValueStoreFrontend> storage_;

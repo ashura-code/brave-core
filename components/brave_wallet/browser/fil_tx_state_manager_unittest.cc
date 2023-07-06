@@ -18,7 +18,6 @@
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
 #include "brave/components/brave_wallet/common/test_utils.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
-#include "content/public/test/browser_task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace brave_wallet {
@@ -40,7 +39,7 @@ class FilTxStateManagerUnitTest : public testing::Test {
 
   PrefService* GetPrefs() { return &prefs_; }
 
-  content::BrowserTaskEnvironment task_environment_;
+  base::test::TaskEnvironment task_environment_;
   base::ScopedTempDir temp_dir_;
   scoped_refptr<value_store::TestValueStoreFactory> factory_;
   std::unique_ptr<value_store::ValueStoreFrontend> storage_;

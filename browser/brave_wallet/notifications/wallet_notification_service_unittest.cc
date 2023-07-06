@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "base/files/scoped_temp_dir.h"
+#include "base/task/sequenced_task_runner.h"
 #include "brave/components/brave_wallet/browser/eth_transaction.h"
 #include "brave/components/brave_wallet/browser/eth_tx_meta.h"
 #include "brave/components/brave_wallet/browser/json_rpc_service.h"
@@ -42,9 +43,9 @@ class WalletNotificationServiceUnitTest : public testing::Test {
     keyring_service_ = std::make_unique<KeyringService>(json_rpc_service_.get(),
                                                         prefs(), local_state());
     ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
-    tx_service_ = std::make_unique<TxService>(json_rpc_service_.get(), nullptr,
-                                              keyring_service_.get(), prefs(),
-                                              temp_dir_.GetPath());
+    tx_service_ = std::make_unique<TxService>(
+        json_rpc_service_.get(), nullptr, keyring_service_.get(), prefs(),
+        temp_dir_.GetPath(), base::SequencedTaskRunner::GetCurrentDefault());
     notification_service_ =
         std::make_unique<WalletNotificationService>(profile());
     tester_ = std::make_unique<NotificationDisplayServiceTester>(profile());

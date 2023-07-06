@@ -24,6 +24,7 @@ class PrefService;
 
 namespace base {
 class FilePath;
+class SequencedTaskRunner;
 }  // namespace base
 
 namespace value_store {
@@ -51,7 +52,8 @@ class TxService : public KeyedService,
             BitcoinWalletService* bitcoin_wallet_service,
             KeyringService* keyring_service,
             PrefService* prefs,
-            const base::FilePath& context_path);
+            const base::FilePath& context_path,
+            const scoped_refptr<base::SequencedTaskRunner>& ui_task_runner);
   ~TxService() override;
   TxService(const TxService&) = delete;
   TxService operator=(const TxService&) = delete;

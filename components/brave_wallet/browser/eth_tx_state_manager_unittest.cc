@@ -11,6 +11,7 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/run_loop.h"
 #include "base/test/bind.h"
+#include "base/test/task_environment.h"
 #include "base/time/time.h"
 #include "base/values.h"
 #include "brave/components/brave_wallet/browser/brave_wallet_prefs.h"
@@ -23,7 +24,6 @@
 #include "brave/components/brave_wallet/common/test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
-#include "content/public/test/browser_task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "url/origin.h"
 
@@ -46,7 +46,7 @@ class EthTxStateManagerUnitTest : public testing::Test {
 
   PrefService* GetPrefs() { return &prefs_; }
 
-  content::BrowserTaskEnvironment task_environment_;
+  base::test::TaskEnvironment task_environment_;
   base::ScopedTempDir temp_dir_;
   scoped_refptr<value_store::TestValueStoreFactory> factory_;
   std::unique_ptr<value_store::ValueStoreFrontend> storage_;
