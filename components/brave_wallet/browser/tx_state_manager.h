@@ -38,11 +38,11 @@ class TxStateManager {
   virtual ~TxStateManager();
   TxStateManager(const TxStateManager&) = delete;
 
-  void AddOrUpdateTx(const TxMeta& meta);
+  bool AddOrUpdateTx(const TxMeta& meta);
   std::unique_ptr<TxMeta> GetTx(const std::string& chain_id,
                                 const std::string& id);
-  void DeleteTx(const std::string& chain_id, const std::string& id);
-  void WipeTxs();
+  bool DeleteTx(const std::string& chain_id, const std::string& id);
+  bool WipeTxs();
 
   static void MigrateAddChainIdToTransactionInfo(PrefService* prefs);
   static void MigrateSolanaTransactionsForV0TransactionsSupport(
@@ -61,6 +61,7 @@ class TxStateManager {
     virtual void OnTransactionStatusChanged(mojom::TransactionInfoPtr tx_info) {
     }
     virtual void OnNewUnapprovedTx(mojom::TransactionInfoPtr tx_info) {}
+    virtual void OnInitialized() {}
   };
 
   void AddObserver(Observer* observer);
@@ -82,9 +83,9 @@ class TxStateManager {
   void Initialize();
   void OnTxsRead(absl::optional<base::Value> txs);
 
-  // Post task to valure store to write to db. If init is not done yet, delayed
-  // task will be posted with maximum 3 times retries.
-  void ScheduleWrite(size_t retry_attempts);
+  // Post task to valure store to write to db. If init is not done yet, it will
+  // return false.
+  bool ScheduleWrite();
 
   void RetireTxByStatus(const std::string& chain_id,
                         mojom::TransactionStatus status,

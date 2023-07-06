@@ -26,8 +26,6 @@ namespace {
 constexpr size_t kMaxConfirmedTxNum = 500;
 constexpr size_t kMaxRejectedTxNum = 500;
 constexpr char kStorageTransactions[] = "transactions";
-constexpr size_t kMaxInitRetryAttempts = 3;
-constexpr int kDelayedInitRetryMsec = 500;
 
 }  // namespace
 
@@ -129,34 +127,29 @@ void TxStateManager::OnTxsRead(absl::optional<base::Value> txs) {
     txs_ = std::move(txs->GetDict());
   }
   initialized_ = true;
+  for (auto& observer : observers_) {
+    observer.OnInitialized();
+  }
 }
 
-void TxStateManager::ScheduleWrite(size_t retry_attempts) {
-  // Schedule a delayed task with maximum retry.
+bool TxStateManager::ScheduleWrite() {
   if (!initialized_) {
-    if (retry_attempts < kMaxInitRetryAttempts) {
-      base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
-          FROM_HERE,
-          base::BindOnce(&TxStateManager::ScheduleWrite,
-                         weak_factory_.GetWeakPtr(), retry_attempts + 1),
-          base::Milliseconds(kDelayedInitRetryMsec));
-    } else {
-      LOG(ERROR)
-          << "TxStateManager wait for init maximum retry attempts reached.";
-      // Skip and wait for the next one.
-      return;
-    }
+    VLOG(1) << __FUNCTION__ << "storage is not initialized yet";
+    return false;
   }
   store_->Set(kStorageTransactions, base::Value(txs_.Clone()));
+  return true;
 }
 
-void TxStateManager::AddOrUpdateTx(const TxMeta& meta) {
+bool TxStateManager::AddOrUpdateTx(const TxMeta& meta) {
   const std::string path =
       base::JoinString({GetTxPrefPathPrefix(meta.chain_id()), meta.id()}, ".");
 
   bool is_add = txs_.FindByDottedPath(path) == nullptr;
   txs_.SetByDottedPath(path, meta.ToValue());
-  ScheduleWrite(0);
+  if (!ScheduleWrite()) {
+    return false;
+  }
   if (!is_add) {
     for (auto& observer : observers_) {
       observer.OnTransactionStatusChanged(meta.ToTransactionInfo());
@@ -172,6 +165,7 @@ void TxStateManager::AddOrUpdateTx(const TxMeta& meta) {
     RetireTxByStatus(meta.chain_id(), mojom::TransactionStatus::Rejected,
                      kMaxRejectedTxNum);
   }
+  return true;
 }
 
 std::unique_ptr<TxMeta> TxStateManager::GetTx(const std::string& chain_id,
@@ -185,16 +179,22 @@ std::unique_ptr<TxMeta> TxStateManager::GetTx(const std::string& chain_id,
   return ValueToTxMeta(*value);
 }
 
-void TxStateManager::DeleteTx(const std::string& chain_id,
+bool TxStateManager::DeleteTx(const std::string& chain_id,
                               const std::string& id) {
   txs_.RemoveByDottedPath(
       base::JoinString({GetTxPrefPathPrefix(chain_id), id}, "."));
-  ScheduleWrite(0);
+  if (!ScheduleWrite()) {
+    return false;
+  }
+  return true;
 }
 
-void TxStateManager::WipeTxs() {
+bool TxStateManager::WipeTxs() {
   txs_.RemoveByDottedPath(GetTxPrefPathPrefix(absl::nullopt));
-  ScheduleWrite(0);
+  if (!ScheduleWrite()) {
+    return false;
+  }
+  return true;
 }
 
 std::vector<std::unique_ptr<TxMeta>> TxStateManager::GetTransactionsByStatus(

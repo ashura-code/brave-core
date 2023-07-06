@@ -25,6 +25,7 @@
 #include "brave/components/brave_wallet/browser/solana_transaction.h"
 #include "brave/components/brave_wallet/browser/solana_tx_meta.h"
 #include "brave/components/brave_wallet/browser/solana_tx_state_manager.h"
+#include "brave/components/brave_wallet/browser/test_utils.h"
 #include "brave/components/brave_wallet/browser/tx_service.h"
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
 #include "brave/components/brave_wallet/common/brave_wallet_constants.h"
@@ -80,6 +81,8 @@ class SolanaTxManagerUnitTest : public testing::Test {
     tx_service_ = std::make_unique<TxService>(
         json_rpc_service_.get(), nullptr, keyring_service_.get(), &prefs_,
         temp_dir_.GetPath(), base::SequencedTaskRunner::GetCurrentDefault());
+    WaitForTxStateManagerInitialized(
+        solana_tx_manager()->tx_state_manager_.get());
     CreateWallet();
     AddAccount();
   }
@@ -1138,7 +1141,8 @@ TEST_F(SolanaTxManagerUnitTest, ProcessSolanaHardwareSignature) {
                                                    system_transfer_meta_id);
   meta->tx()->message()->set_recent_blockhash(latest_blockhash1_);
   meta->tx()->message()->set_last_valid_block_height(last_valid_block_height1_);
-  solana_tx_manager()->GetSolanaTxStateManager()->AddOrUpdateTx(*meta);
+  ASSERT_TRUE(
+      solana_tx_manager()->GetSolanaTxStateManager()->AddOrUpdateTx(*meta));
 
   // Valid blockhash and valid number of signers is valid
   TestProcessSolanaHardwareSignature(

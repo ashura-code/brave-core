@@ -375,6 +375,20 @@ source_set("transaction") {
   ]
 }
 
+source_set("test_support") {
+  testonly = true
+  sources = [
+    "test_utils.cc",
+    "test_utils.h",
+  ]
+
+  deps = [
+    ":browser",
+    "//base",
+    "//testing/gmock",
+  ]
+}  # source_set("test_support")
+
 generated_types("generated_blockchain_list_schemas") {
   sources = [ "blockchain_list_schemas.idl" ]
   root_namespace = "brave_wallet::%(namespace)s"

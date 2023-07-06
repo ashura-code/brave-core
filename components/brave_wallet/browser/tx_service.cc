@@ -57,13 +57,12 @@ size_t CalculatePendingTxCount(
 
 }  // namespace
 
-TxService::TxService(
-    JsonRpcService* json_rpc_service,
-    BitcoinWalletService* bitcoin_wallet_service,
-    KeyringService* keyring_service,
-    PrefService* prefs,
-    const base::FilePath& context_path,
-    const scoped_refptr<base::SequencedTaskRunner>& ui_task_runner)
+TxService::TxService(JsonRpcService* json_rpc_service,
+                     BitcoinWalletService* bitcoin_wallet_service,
+                     KeyringService* keyring_service,
+                     PrefService* prefs,
+                     const base::FilePath& context_path,
+                     scoped_refptr<base::SequencedTaskRunner> ui_task_runner)
     : prefs_(prefs), json_rpc_service_(json_rpc_service), weak_factory_(this) {
   store_factory_ = base::MakeRefCounted<value_store::ValueStoreFactoryImpl>(
       context_path.AppendASCII(kWalletBaseDirectory));

@@ -103,6 +103,7 @@ class SolanaTxManager : public TxManager, public SolanaBlockTracker::Observer {
                                                 const std::string& tx_meta_id);
 
  private:
+  friend class SolanaTxManagerUnitTest;
   FRIEND_TEST_ALL_PREFIXES(SolanaTxManagerUnitTest, AddAndApproveTransaction);
   FRIEND_TEST_ALL_PREFIXES(SolanaTxManagerUnitTest, DropTxWithInvalidBlockhash);
   FRIEND_TEST_ALL_PREFIXES(SolanaTxManagerUnitTest,

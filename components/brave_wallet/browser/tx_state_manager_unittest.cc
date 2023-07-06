@@ -21,6 +21,7 @@
 #include "brave/components/brave_wallet/browser/eth_tx_meta.h"
 #include "brave/components/brave_wallet/browser/eth_tx_state_manager.h"
 #include "brave/components/brave_wallet/browser/pref_names.h"
+#include "brave/components/brave_wallet/browser/test_utils.h"
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
 #include "brave/components/brave_wallet/common/test_utils.h"
 #include "brave/components/brave_wallet/common/value_conversion_utils.h"
@@ -65,6 +66,7 @@ class TxStateManagerUnitTest : public testing::Test {
     storage_ = GetValueStoreFrontendForTest(factory_);
     tx_state_manager_ =
         std::make_unique<EthTxStateManager>(&prefs_, storage_.get());
+    WaitForTxStateManagerInitialized(tx_state_manager_.get());
   }
 
   void UpdateCustomNetworks(PrefService* prefs,
@@ -104,7 +106,7 @@ TEST_F(TxStateManagerUnitTest, TxOperations) {
   meta.set_chain_id(mojom::kMainnetChainId);
   EXPECT_FALSE(GetTxs());
   // Add
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
   EXPECT_TRUE(GetTxs());
   {
     auto txs = GetTxs();
@@ -126,7 +128,7 @@ TEST_F(TxStateManagerUnitTest, TxOperations) {
 
   meta.set_tx_hash("0xabcd");
   // Update
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
   {
     auto txs = GetTxs();
     ASSERT_TRUE(txs);
@@ -148,7 +150,7 @@ TEST_F(TxStateManagerUnitTest, TxOperations) {
   meta.set_id("002");
   meta.set_tx_hash("0xabff");
   // Add another one
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
   {
     auto txs = GetTxs();
     ASSERT_TRUE(txs);
@@ -182,7 +184,7 @@ TEST_F(TxStateManagerUnitTest, TxOperations) {
   }
 
   // Delete
-  tx_state_manager_->DeleteTx(mojom::kMainnetChainId, "001");
+  ASSERT_TRUE(tx_state_manager_->DeleteTx(mojom::kMainnetChainId, "001"));
   {
     auto txs = GetTxs();
     ASSERT_TRUE(txs);
@@ -197,7 +199,7 @@ TEST_F(TxStateManagerUnitTest, TxOperations) {
   }
 
   // Purge
-  tx_state_manager_->WipeTxs();
+  ASSERT_TRUE(tx_state_manager_->WipeTxs());
   auto txs = GetTxs();
   const auto& dict = txs->GetDict();
   EXPECT_EQ(dict.size(), 0u);
@@ -235,7 +237,7 @@ TEST_F(TxStateManagerUnitTest, GetTransactionsByStatus) {
       }
       meta.set_status(mojom::TransactionStatus::Submitted);
     }
-    tx_state_manager_->AddOrUpdateTx(meta);
+    ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
   }
 
   EXPECT_EQ(
@@ -351,7 +353,7 @@ TEST_F(TxStateManagerUnitTest, GetTransactionsByStatus) {
   meta.set_id("xyz");
   meta.set_chain_id(custom_chain.chain_id);
   meta.set_status(mojom::TransactionStatus::Submitted);
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
 
   // OK: no filter
   EXPECT_EQ(
@@ -403,15 +405,15 @@ TEST_F(TxStateManagerUnitTest, MultiChainId) {
   EthTxMeta meta;
   meta.set_id("001");
   meta.set_chain_id(mojom::kMainnetChainId);
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
 
   EXPECT_EQ(tx_state_manager_->GetTx(mojom::kGoerliChainId, "001"), nullptr);
   meta.set_chain_id(mojom::kGoerliChainId);
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
 
   EXPECT_EQ(tx_state_manager_->GetTx(mojom::kLocalhostChainId, "001"), nullptr);
   meta.set_chain_id(mojom::kLocalhostChainId);
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
 
   auto txs = GetTxs();
   ASSERT_TRUE(txs);
@@ -450,7 +452,7 @@ TEST_F(TxStateManagerUnitTest, RetireOldTxMeta) {
       meta.set_status(mojom::TransactionStatus::Rejected);
       meta.set_created_time(base::Time::Now());
     }
-    tx_state_manager_->AddOrUpdateTx(meta);
+    ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
   }
 
   EXPECT_TRUE(tx_state_manager_->GetTx(mojom::kMainnetChainId, "0"));
@@ -459,7 +461,7 @@ TEST_F(TxStateManagerUnitTest, RetireOldTxMeta) {
   meta1000.set_chain_id(mojom::kMainnetChainId);
   meta1000.set_status(mojom::TransactionStatus::Confirmed);
   meta1000.set_confirmed_time(base::Time::Now());
-  tx_state_manager_->AddOrUpdateTx(meta1000);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta1000));
   EXPECT_FALSE(tx_state_manager_->GetTx(mojom::kMainnetChainId, "0"));
 
   EXPECT_TRUE(tx_state_manager_->GetTx(mojom::kMainnetChainId, "1"));
@@ -468,7 +470,7 @@ TEST_F(TxStateManagerUnitTest, RetireOldTxMeta) {
   meta1001.set_chain_id(mojom::kMainnetChainId);
   meta1001.set_status(mojom::TransactionStatus::Rejected);
   meta1001.set_created_time(base::Time::Now());
-  tx_state_manager_->AddOrUpdateTx(meta1001);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta1001));
   EXPECT_FALSE(tx_state_manager_->GetTx(mojom::kMainnetChainId, "1"));
 
   // Other status doesn't matter
@@ -479,7 +481,7 @@ TEST_F(TxStateManagerUnitTest, RetireOldTxMeta) {
   meta1002.set_chain_id(mojom::kMainnetChainId);
   meta1002.set_status(mojom::TransactionStatus::Submitted);
   meta1002.set_created_time(base::Time::Now());
-  tx_state_manager_->AddOrUpdateTx(meta1002);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta1002));
   EXPECT_TRUE(tx_state_manager_->GetTx(mojom::kMainnetChainId, "2"));
   EXPECT_TRUE(tx_state_manager_->GetTx(mojom::kMainnetChainId, "3"));
 
@@ -489,7 +491,7 @@ TEST_F(TxStateManagerUnitTest, RetireOldTxMeta) {
   meta1003.set_chain_id(mojom::kGoerliChainId);
   meta1003.set_status(mojom::TransactionStatus::Confirmed);
   meta1003.set_created_time(base::Time::Now());
-  tx_state_manager_->AddOrUpdateTx(meta1003);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta1003));
   EXPECT_TRUE(tx_state_manager_->GetTx(mojom::kMainnetChainId, "2"));
   EXPECT_TRUE(tx_state_manager_->GetTx(mojom::kMainnetChainId, "3"));
 }
@@ -503,7 +505,7 @@ TEST_F(TxStateManagerUnitTest, Observer) {
   EXPECT_CALL(observer,
               OnNewUnapprovedTx(EqualsMojo(meta.ToTransactionInfo())));
   EXPECT_CALL(observer, OnTransactionStatusChanged(_)).Times(0);
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
   EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&observer));
 
   // Modify
@@ -512,7 +514,7 @@ TEST_F(TxStateManagerUnitTest, Observer) {
   EXPECT_CALL(observer,
               OnTransactionStatusChanged(EqualsMojo(meta.ToTransactionInfo())))
       .Times(1);
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
   EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&observer));
 }
 
@@ -894,6 +896,14 @@ TEST_F(TxStateManagerUnitTest, MigrateTransactionsFromPrefsToDB) {
   EXPECT_TRUE(prefs_.GetBoolean(kBraveWalletTransactionsFromPrefsToDBMigrated));
   // We don't clear pref transactions for this migration
   EXPECT_TRUE(prefs_.HasPrefPath(kBraveWalletTransactions));
+}
+
+TEST_F(TxStateManagerUnitTest, NotInitialized) {
+  tx_state_manager_ =
+      std::make_unique<EthTxStateManager>(&prefs_, storage_.get());
+  EXPECT_FALSE(tx_state_manager_->AddOrUpdateTx(EthTxMeta()));
+  EXPECT_FALSE(tx_state_manager_->DeleteTx(mojom::kMainnetChainId, "001"));
+  EXPECT_FALSE(tx_state_manager_->WipeTxs());
 }
 
 }  // namespace brave_wallet

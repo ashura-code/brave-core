@@ -16,6 +16,7 @@
 #include "brave/components/brave_wallet/browser/fil_tx_meta.h"
 #include "brave/components/brave_wallet/browser/fil_tx_state_manager.h"
 #include "brave/components/brave_wallet/browser/json_rpc_service.h"
+#include "brave/components/brave_wallet/browser/test_utils.h"
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
 #include "brave/components/brave_wallet/common/test_utils.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
@@ -102,6 +103,7 @@ TEST_F(FilNonceTrackerUnitTest, GetNonce) {
   std::unique_ptr<value_store::ValueStoreFrontend> storage =
       GetValueStoreFrontendForTest(factory);
   FilTxStateManager tx_state_manager(GetPrefs(), storage.get());
+  WaitForTxStateManagerInitialized(&tx_state_manager);
   FilNonceTracker nonce_tracker(&tx_state_manager, &service);
 
   SetTransactionCount(2);
@@ -117,7 +119,7 @@ TEST_F(FilNonceTrackerUnitTest, GetNonce) {
   meta.set_from(FilAddress::FromAddress(address).EncodeAsString());
   meta.set_status(mojom::TransactionStatus::Confirmed);
   meta.tx()->set_nonce(uint64_t(2));
-  tx_state_manager.AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager.AddOrUpdateTx(meta));
 
   GetNextNonce(FROM_HERE, &nonce_tracker, mojom::kLocalhostChainId, address,
                true, uint64_t(3));
@@ -126,7 +128,7 @@ TEST_F(FilNonceTrackerUnitTest, GetNonce) {
   meta.set_id(TxMeta::GenerateMetaID());
   meta.set_status(mojom::TransactionStatus::Confirmed);
   meta.tx()->set_nonce(uint64_t(3));
-  tx_state_manager.AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager.AddOrUpdateTx(meta));
 
   GetNextNonce(FROM_HERE, &nonce_tracker, mojom::kLocalhostChainId, address,
                true, uint64_t(4));
@@ -135,9 +137,9 @@ TEST_F(FilNonceTrackerUnitTest, GetNonce) {
   meta.set_status(mojom::TransactionStatus::Submitted);
   meta.tx()->set_nonce(uint64_t(4));
   meta.set_id(TxMeta::GenerateMetaID());
-  tx_state_manager.AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager.AddOrUpdateTx(meta));
   meta.set_id(TxMeta::GenerateMetaID());
-  tx_state_manager.AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager.AddOrUpdateTx(meta));
 
   GetNextNonce(FROM_HERE, &nonce_tracker, mojom::kLocalhostChainId, address,
                true, uint64_t(5));

@@ -53,7 +53,7 @@ class TxService : public KeyedService,
             KeyringService* keyring_service,
             PrefService* prefs,
             const base::FilePath& context_path,
-            const scoped_refptr<base::SequencedTaskRunner>& ui_task_runner);
+            scoped_refptr<base::SequencedTaskRunner> ui_task_runner);
   ~TxService() override;
   TxService(const TxService&) = delete;
   TxService operator=(const TxService&) = delete;
@@ -223,6 +223,7 @@ class TxService : public KeyedService,
       ProcessFilHardwareSignatureCallback callback) override;
 
  private:
+  friend class EthereumProviderImplUnitTest;
   friend class EthTxManagerUnitTest;
   friend class SolanaTxManagerUnitTest;
   friend class FilTxManagerUnitTest;

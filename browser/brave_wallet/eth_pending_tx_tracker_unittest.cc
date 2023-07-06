@@ -19,6 +19,7 @@
 #include "brave/components/brave_wallet/browser/eth_tx_meta.h"
 #include "brave/components/brave_wallet/browser/eth_tx_state_manager.h"
 #include "brave/components/brave_wallet/browser/json_rpc_service.h"
+#include "brave/components/brave_wallet/browser/test_utils.h"
 #include "brave/components/brave_wallet/browser/tx_meta.h"
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
 #include "brave/components/brave_wallet/common/brave_wallet_types.h"
@@ -55,6 +56,7 @@ class EthPendingTxTrackerUnitTest : public testing::Test {
     storage_ = GetValueStoreFrontendForTest(factory_);
     tx_state_manager_ =
         std::make_unique<EthTxStateManager>(GetPrefs(), storage_.get());
+    WaitForTxStateManagerInitialized(tx_state_manager_.get());
   }
 
   PrefService* GetPrefs() { return profile_->GetPrefs(); }
@@ -105,7 +107,7 @@ TEST_F(EthPendingTxTrackerUnitTest, IsNonceTaken) {
   meta_in_state.set_status(mojom::TransactionStatus::Confirmed);
   meta_in_state.set_from(meta.from());
   meta_in_state.tx()->set_nonce(meta.tx()->nonce());
-  tx_state_manager_->AddOrUpdateTx(meta_in_state);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta_in_state));
 
   EXPECT_TRUE(pending_tx_tracker.IsNonceTaken(meta));
 
@@ -154,7 +156,7 @@ TEST_F(EthPendingTxTrackerUnitTest, DropTransaction) {
   meta.set_id("001");
   meta.set_chain_id(mojom::kMainnetChainId);
   meta.set_status(mojom::TransactionStatus::Submitted);
-  tx_state_manager_->AddOrUpdateTx(meta);
+  ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
 
   pending_tx_tracker.DropTransaction(&meta);
   EXPECT_EQ(tx_state_manager_->GetTx(mojom::kMainnetChainId, "001"), nullptr);
@@ -181,27 +183,27 @@ TEST_F(EthPendingTxTrackerUnitTest, UpdatePendingTransactions) {
     meta.set_chain_id(chain_id);
     meta.set_from(addr1);
     meta.set_status(mojom::TransactionStatus::Submitted);
-    tx_state_manager_->AddOrUpdateTx(meta);
+    ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
     meta.set_id(base::StrCat({chain_id, "002"}));
     meta.set_from(addr2);
     meta.tx()->set_nonce(uint256_t(4));
     meta.set_status(mojom::TransactionStatus::Confirmed);
-    tx_state_manager_->AddOrUpdateTx(meta);
+    ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
     meta.set_id(base::StrCat({chain_id, "003"}));
     meta.set_from(addr2);
     meta.tx()->set_nonce(uint256_t(4));
     meta.set_status(mojom::TransactionStatus::Submitted);
-    tx_state_manager_->AddOrUpdateTx(meta);
+    ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
     meta.set_id(base::StrCat({chain_id, "004"}));
     meta.set_from(addr2);
     meta.tx()->set_nonce(uint256_t(4));
     meta.set_status(mojom::TransactionStatus::Signed);
-    tx_state_manager_->AddOrUpdateTx(meta);
+    ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
     meta.set_id(base::StrCat({chain_id, "005"}));
     meta.set_from(addr2);
     meta.tx()->set_nonce(uint256_t(5));
     meta.set_status(mojom::TransactionStatus::Signed);
-    tx_state_manager_->AddOrUpdateTx(meta);
+    ASSERT_TRUE(tx_state_manager_->AddOrUpdateTx(meta));
   }
 
   test_url_loader_factory()->SetInterceptor(

@@ -16,7 +16,6 @@
 
 namespace base {
 class ScopedTempDir;
-class SequencedTaskRunner;
 }  // namespace base
 
 namespace brave_wallet {
