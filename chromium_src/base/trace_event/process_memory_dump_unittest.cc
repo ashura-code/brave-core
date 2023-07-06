@@ -9,6 +9,8 @@ namespace base {
 namespace trace_event {
 
 TEST(ProcessMemoryDumpTest, IsMemoryAllocatorDumpNameInAllowlist) {
+  // reset the test allow list leftover from other suites
+  SetAllocatorDumpNameAllowlistForTesting(nullptr);
   // This is to ensure we capture upstream name pattern changes in
   // value_store::LeveldbValueStore::OnMemoryDump
   ASSERT_TRUE(IsMemoryAllocatorDumpNameInAllowlist(
