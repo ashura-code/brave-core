@@ -12,12 +12,12 @@ namespace brave_vpn {
 
 namespace wireguard {
 
-void IncrementWireguardTunnelLaunchedFlag();
-void ResetWireguardTunnelLaunchedFlag();
+void IncrementWireguardUsageFlag();
+void ResetWireguardTunnelUsageFlag();
 bool UpdateLastUsedConfigPath(const base::FilePath& config_path);
 
 }  // namespace wireguard
+
 }  // namespace brave_vpn
 
-#endif  // #define
-        // BRAVE_COMPONENTS_BRAVE_VPN_BROWSER_CONNECTION_WIREGUARD_WIN_BRAVE_VPN_WIREGUARD_SERVICE_SERVICE_TUNNEL_UTILS_H_
+#endif  // BRAVE_COMPONENTS_BRAVE_VPN_BROWSER_CONNECTION_WIREGUARD_WIN_BRAVE_VPN_WIREGUARD_SERVICE_SERVICE_TUNNEL_UTILS_H_

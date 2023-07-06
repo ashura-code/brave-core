@@ -17,8 +17,8 @@ namespace {
 constexpr wchar_t kBraveWireguardConfigKeyName[] = L"ConfigPath";
 }  // namespace
 
-// Increments number of launches for the wireguard tunnel service.
-void IncrementWireguardTunnelLaunchedFlag() {
+// Increments number of usages for the wireguard tunnel service.
+void IncrementWireguardUsageFlag() {
   base::win::RegKey key(
       HKEY_LOCAL_MACHINE,
       brave_vpn::GetBraveVpnWireguardServiceRegistryStoragePath().c_str(),
@@ -28,13 +28,13 @@ void IncrementWireguardTunnelLaunchedFlag() {
     return;
   }
   DWORD launch = 0;
-  key.ReadValueDW(kBraveVpnWireguardCounterOfTunnelLaunches, &launch);
+  key.ReadValueDW(kBraveVpnWireguardCounterOfTunnelUsage, &launch);
   launch++;
-  key.WriteValue(kBraveVpnWireguardCounterOfTunnelLaunches, launch);
+  key.WriteValue(kBraveVpnWireguardCounterOfTunnelUsage, launch);
 }
 
 // Resets number of launches for the wireguard tunnel service.
-void ResetWireguardTunnelLaunchedFlag() {
+void ResetWireguardTunnelUsageFlag() {
   base::win::RegKey key(
       HKEY_LOCAL_MACHINE,
       brave_vpn::GetBraveVpnWireguardServiceRegistryStoragePath().c_str(),
@@ -43,7 +43,7 @@ void ResetWireguardTunnelLaunchedFlag() {
     VLOG(1) << "Failed to open vpn service storage";
     return;
   }
-  key.DeleteValue(kBraveVpnWireguardCounterOfTunnelLaunches);
+  key.DeleteValue(kBraveVpnWireguardCounterOfTunnelUsage);
 }
 
 bool UpdateLastUsedConfigPath(const base::FilePath& config_path) {

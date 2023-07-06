@@ -16,7 +16,7 @@ namespace wireguard {
 namespace {
 constexpr wchar_t kBraveWireguardConfigKeyName[] = L"ConfigPath";
 constexpr wchar_t kBraveWireguardEnableTrayIconKeyName[] = L"EnableTrayIcon";
-constexpr uint16_t kBraveVpnWireguardMaxFailedAttempts = 5;
+constexpr uint16_t kBraveVpnWireguardMaxFailedAttempts = 3;
 }  // namespace
 
 bool IsVPNTrayIconEnabled() {
@@ -62,7 +62,7 @@ bool ShouldFallbackToIKEv2() {
     return false;
   }
   DWORD launch = 0;
-  key.ReadValueDW(kBraveVpnWireguardCounterOfTunnelLaunches, &launch);
+  key.ReadValueDW(kBraveVpnWireguardCounterOfTunnelUsage, &launch);
   return launch >= kBraveVpnWireguardMaxFailedAttempts;
 }
 
