@@ -3,6 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+#import <Foundation/Foundation.h>
+
 #import "brave/browser/brave_app_controller_mac.h"
 
 #include "brave/app/brave_command_ids.h"
@@ -106,7 +108,11 @@
 }
 
 - (instancetype)init {
-  return [super initForBrave];
+  self = [super initForBrave];
+  return self;
+  // return nil;
+  // self =  [super initForBrave];
+  // return self;
 }
 
 @end  // @implementation BraveAppController
