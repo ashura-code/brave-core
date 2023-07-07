@@ -218,7 +218,6 @@ IN_PROC_BROWSER_TEST_F(BraveMainDelegateBrowserTest, DisabledFeatures) {
         kRemoteOptimizationGuideFetchingAnonymousDataConsent,
     &page_image_service::kImageServiceSuggestPoweredImages,
 #if !BUILDFLAG(IS_ANDROID)
-    &page_info::kPageInfoCookiesSubpage,
     &permissions::features::kPermissionsPromptSurvey,
     &permissions::features::kPermissionStorageAccessAPI,
     &permissions::features::kRecordPermissionExpirationTimestamps,
