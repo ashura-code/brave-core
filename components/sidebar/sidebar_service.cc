@@ -91,6 +91,7 @@ void SidebarService::RegisterProfilePrefs(PrefRegistrySimple* registry,
           : static_cast<int>(ShowSidebarOption::kShowAlways));
   registry->RegisterIntegerPref(kSidebarItemAddedFeedbackBubbleShowCount, 0);
   registry->RegisterIntegerPref(kSidePanelWidth, kDefaultSidePanelWidth);
+  LOG(INFO) << "SidebarService::RegisterProfilePrefs";
 }
 
 SidebarService::SidebarService(PrefService* prefs) : prefs_(prefs) {
@@ -348,7 +349,6 @@ void SidebarService::UpdateSidebarItemsToPrefStore() {
   // they've chosen to hide.
   base::Value::List items;
   DVLOG(2) << "Serializing items (count: " << items_.size() << ")";
-
   // Serialize each item
   for (const auto& item : items_) {
     DVLOG(2) << "Adding item to pref list: "

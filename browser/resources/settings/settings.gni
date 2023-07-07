@@ -22,5 +22,11 @@ if (enable_pin_shortcut) {
   ]
 }
 
+if (enable_ai_chat) {
+  settings_namespace_rewrites += [
+    "settings.BraveLeoAssistantBrowserProxyImpl|BraveLeoAssistantBrowserProxyImpl",
+  ]
+}
+
 settings_auto_imports =
     [ "chrome/browser/resources/settings/router.html|Router,Route" ]
