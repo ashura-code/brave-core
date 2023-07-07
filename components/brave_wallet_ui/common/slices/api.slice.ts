@@ -25,7 +25,9 @@ import {
   SerializableTransactionInfo,
   SPLTransferFromParams,
   SupportedCoinTypes,
-  SpotPriceRegistry
+  SpotPriceRegistry,
+  GetPriceHistoryReturnInfo,
+  NFTMetadataReturnType
 } from '../../constants/types'
 import {
   CancelTransactionPayload,
@@ -90,7 +92,7 @@ import { shouldReportTransactionP3A, sortTransactionByDate, toTxDataUnion } from
 import {
   makeSerializableTransaction
 } from '../../utils/model-serialization-utils'
-import { addLogoToToken } from '../async/lib'
+import { addLogoToToken, getNFTMetadata, translateToNftGateway } from '../async/lib'
 import {
   dialogErrorFromLedgerErrorCode,
   signLedgerEthereumTransaction,
@@ -103,6 +105,7 @@ import {
   maxBatchSizePrice,
   maxConcurrentPriceRequests
 } from './constants'
+import { getTokenParam } from '../../utils/api-utils'
 
 type GetAccountTokenCurrentBalanceArg = {
   coin: BraveWallet.CoinType,
@@ -158,6 +161,12 @@ interface GetTransactionsQueryArg {
 interface GetTokenSpotPricesArg {
   ids: string[]
   timeframe?: BraveWallet.AssetPriceTimeframe
+}
+
+interface GetPriceHistoryArg {
+  asset?: BraveWallet.BlockchainToken
+  vsAsset: string // default currency
+  timeFrame: number
 }
 
 const NETWORK_TAG_IDS = {
@@ -2700,6 +2709,133 @@ export function createWalletApi () {
           }
         },
         invalidatesTags: ['NftDiscoveryEnabledStatus']
+      }),
+      getPriceHistory: query<GetPriceHistoryReturnInfo[], GetPriceHistoryArg>({
+        queryFn: async (arg, _api, _extraOptions, _baseQuery) => {
+          try {
+            const { assetRatioService } = apiProxyFetcher()
+            
+            if (arg.asset) {
+              const priceHistory = await assetRatioService.getPriceHistory(getTokenParam(arg.asset), arg.vsAsset, arg.timeFrame)
+              return {
+                data: priceHistory.values
+              }
+            } else {
+              return {
+                data: []
+              }
+            } 
+          } catch(error) {
+            return {
+              error
+            }
+          }
+        },
+        providesTags: (_result, err, arg) => err
+        ? ['PriceHistory']
+        : [{ type: 'PriceHistory', id: arg.asset ? getAssetIdKey(arg.asset): '' }]
+      }),
+      getNftMetadata: query<NFTMetadataReturnType, BraveWallet.BlockchainToken>({
+        queryFn: async (arg, _api, _extraOptions, _baseQuery) => {
+          try {
+            const result = await getNFTMetadata(arg)
+            if (!result?.error) {
+              const response = result?.response && JSON.parse(result.response)
+              const attributes = Array.isArray(response.attributes)
+              ? response.attributes.map((attr: { trait_type: string; value: string }) => ({ traitType: attr.trait_type, value: attr.value }))
+              : []
+              const tokenNetwork = await getNetwork(apiProxyFetcher(), arg)
+        
+              const nftMetadata: NFTMetadataReturnType = {
+                metadataUrl: result?.tokenUrl || '',
+                chainName: tokenNetwork?.chainName || '',
+                tokenType:
+                  arg.coin === BraveWallet.CoinType.ETH
+                    ? 'ERC721'
+                    : arg.coin === BraveWallet.CoinType.SOL
+                    ? 'SPL'
+                    : '',
+                tokenID: arg.tokenId,
+                imageURL: response.image.startsWith('data:image/')
+                  ? response.image
+                  : await translateToNftGateway(response.image),
+                imageMimeType: 'image/*',
+                floorFiatPrice: '',
+                floorCryptoPrice: '',
+                contractInformation: {
+                  address: arg.contractAddress,
+                  name: response.name,
+                  description: response.description,
+                  website: '',
+                  facebook: '',
+                  logo: '',
+                  twitter: ''
+                },
+                attributes
+              }
+
+              return {
+                data: nftMetadata
+              }
+            } else {
+              return {
+                error: result.errorMessage
+              }
+            }
+          }
+          catch (error) {
+            console.error('Error fetching NFT metadata: ', error)
+            return {
+              error: JSON.stringify(error)
+            }
+          }
+        },
+        providesTags: (_result, err, arg) => err
+        ? ['ERC721Metadata']
+        : [{ type: 'ERC721Metadata', id: getAssetIdKey(arg) }] 
+      }),
+      getNftPinningStatus: query<BraveWallet.TokenPinStatus | undefined, BraveWallet.BlockchainToken>({
+        queryFn: async (arg, _api, _extraOptions, _baseQuery) => {
+          try {
+            const { braveWalletPinService } = apiProxyFetcher()
+            const result = await braveWalletPinService.getTokenStatus(arg)
+
+            if (result.error) {
+              return {
+                error: result.error.message
+              }
+            } else {
+              return {
+                data: result.status ? result.status.local : undefined
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching NFT Pinning status: ', error)
+            return {
+              error: JSON.stringify(error)
+            }            
+          }
+        },
+        providesTags: (_result, err, arg) => err
+        ? ['NFTPinningStatus']
+        : [{ type: 'NFTPinningStatus', id: getAssetIdKey(arg)}]
+      }),
+      getAutopinEnabled: query<boolean, void>({
+        queryFn: async (_arg, _api, _extraOptions, _baseQuery) => {
+          try {
+            const { braveWalletAutoPinService } = apiProxyFetcher()
+            const result = await braveWalletAutoPinService.isAutoPinEnabled()
+            
+            return {
+              data: result.enabled
+            }
+          } catch(error) {
+            return { 
+              error: error
+            }
+          }
+        },
+        providesTags: ['AutoPinEnabled']
       })
     }}
   })
@@ -2792,6 +2928,10 @@ export const {
   useLazyGetTokensRegistryQuery,
   useLazyGetTransactionsQuery,
   useLazyGetUserTokensRegistryQuery,
+  useGetPriceHistoryQuery,
+  useGetNftMetadataQuery,
+  useGetNftPinningStatusQuery,
+  useGetAutopinEnabledQuery,
   useNewUnapprovedTxAddedMutation,
   useOpenPanelUIMutation,
   usePrefetch,
