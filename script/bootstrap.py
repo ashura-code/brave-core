@@ -9,7 +9,7 @@ import argparse
 import os
 import sys
 
-from lib.config import PLATFORM, SOURCE_ROOT, \
+from lib.config import PLATFORM, SOURCE_ROOT, CHROMIUM_ROOT, \
     enable_verbose_mode, is_verbose_mode
 from lib.util import execute_stdout, scoped_cwd
 
@@ -35,6 +35,7 @@ def main():
 
     setup_python_libs()
     update_node_modules('.')
+    copy_widevine_signature_generator()
 
 
 def parse_args():
@@ -77,6 +78,15 @@ def update_win32_python():
     with scoped_cwd(VENDOR_DIR):
         if not os.path.exists('python_26'):
             execute_stdout(['git', 'clone', PYTHON_26_URL])
+
+
+def copy_widevine_signature_generator():
+    script_dir = os.path.join(CHROMIUM_ROOT, 'third_party', 'widevine',
+                              'scripts')
+    src = os.path.join(script_dir, 'signature_generator_python3.py')
+    dst = os.path.join(script_dir, 'signature_generator.py')
+    os.remove(dst)
+    os.rename(src, dst)
 
 
 if __name__ == '__main__':
