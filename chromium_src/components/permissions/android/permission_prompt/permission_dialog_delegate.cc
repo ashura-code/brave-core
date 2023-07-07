@@ -4,7 +4,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #define CreateJavaDelegate \
-  BraveCreateDialog(JNIEnv* env, const base::android::JavaRef<jobject>& obj); \
+  Java_PermissionDialogController_createDialog_BraveImpl(JNIEnv* env, const base::android::JavaRef<jobject>& obj); \
   virtual void CreateJavaDelegate
 #include "components/permissions/android/permission_prompt/permission_dialog_delegate.h"
 #undef CreateJavaDelegate
@@ -66,23 +66,19 @@ void ApplyLifetimeToPermissionRequests(
   }
 }
 
-void Brave_PermissionDialogController_createDialog(
-    JNIEnv* env,
-    const base::android::JavaRef<jobject>& j_delegate) {
-  Java_PermissionDialogController_createDialog(env, j_delegate);
-}
-
 }  // namespace
 
-void PermissionDialogJavaDelegate::BraveCreateDialog(
+void PermissionDialogJavaDelegate::Java_PermissionDialogController_createDialog_BraveImpl(
     JNIEnv* env,
     const base::android::JavaRef<jobject>& j_delegate) {
   const std::vector<PermissionRequest*>& requests = permission_prompt_->delegate()->Requests();
   if (requests.size() == 1 && requests[0]->request_type() == RequestType::kWidevine)
     Java_BravePermissionDialogDelegate_setIsWidevinePermissionRequest(env, j_delegate, true);
   if (ShouldShowLifetimeOptions(permission_prompt_->delegate())) SetLifetimeOptions(j_delegate);
-  Brave_PermissionDialogController_createDialog(env, j_delegate);
+
+  Java_PermissionDialogController_createDialog(env, j_delegate);
 }
+
 }  // namespace permissions
 
 #define BRAVE_PERMISSION_DIALOG_DELEGATE_ACCEPT \
@@ -90,7 +86,7 @@ void PermissionDialogJavaDelegate::BraveCreateDialog(
 #define BRAVE_PERMISSION_DIALOG_DELEGATE_CANCEL \
   ApplyLifetimeToPermissionRequests(env, obj, permission_prompt_);
 #define Java_PermissionDialogController_createDialog \
-  BraveCreateDialog
+  Java_PermissionDialogController_createDialog_BraveImpl
 
 #include "src/components/permissions/android/permission_prompt/permission_dialog_delegate.cc"
 

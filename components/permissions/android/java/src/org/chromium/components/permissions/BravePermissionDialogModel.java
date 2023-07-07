@@ -7,12 +7,14 @@ package org.chromium.components.permissions;
 
 import android.content.Context;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 
+import org.chromium.base.Log;
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.ui.base.ViewUtils;
 import org.chromium.ui.modaldialog.ModalDialogProperties;
@@ -24,9 +26,38 @@ class BravePermissionDialogModel {
             PermissionDialogDelegate delegate, Runnable touchFilteredCallback) {
         PropertyModel model =
                 PermissionDialogModel.getModel(controller, delegate, touchFilteredCallback);
-        View customView = (View) model.get(ModalDialogProperties.CUSTOM_VIEW);
-        addLifetimeOptions(customView, delegate);
+        BravePermissionDialogDelegate braveDelegate =
+                (BravePermissionDialogDelegate) (Object) delegate;
+        if (braveDelegate.getIsWidevinePermissionRequest()) {
+            modifyModelForWidevineRequests(model);
+        } else {
+            View customView = (View) model.get(ModalDialogProperties.CUSTOM_VIEW);
+            addLifetimeOptions(customView, delegate);
+        }
+
         return model;
+    }
+
+    private static void modifyModelForWidevineRequests(PropertyModel model) {
+        View view = (View) model.get(ModalDialogProperties.CUSTOM_VIEW);
+        while (view.getParent() instanceof View) {
+            view = (View) view.getParent();
+        }
+        recursiveLoopChildren((ViewGroup) view);
+    }
+
+    private static void recursiveLoopChildren(ViewGroup parent) {
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            final View child = parent.getChildAt(i);
+            if (child instanceof ViewGroup) {
+                recursiveLoopChildren((ViewGroup) child);
+                // DO SOMETHING WITH VIEWGROUP, AFTER CHILDREN HAS BEEN LOOPED
+            } else {
+                if (child != null) {
+                    Log.e("BravePermissionDialogModel", child.getResources().getResourceName(child.getId()));
+                }
+            }
+        }
     }
 
     /* Adds a permission lifetime options to a dialog view if lifetime options are available. */

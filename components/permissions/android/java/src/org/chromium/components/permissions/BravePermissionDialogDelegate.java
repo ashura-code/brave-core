@@ -58,4 +58,8 @@ public class BravePermissionDialogDelegate {
     public void setIsWidevinePermissionRequest(boolean isWidevineRequest) {
         mIsWidevinePermissionRequest = isWidevineRequest;
     }
+
+    public boolean getIsWidevinePermissionRequest() {
+        return mIsWidevinePermissionRequest;
+    }
 }
