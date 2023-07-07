@@ -108,8 +108,9 @@
       Get email alerts if the price drops on any site
     </message>
     <message name="IDS_BOOKMARK_STAR_DIALOG_TRACK_PRICE_DESCRIPTION_EMAIL_OFF" desc="The description text for the dialog that is shown when a user clicks the bookmark star icon on a product web page. We use this text only if the email notification is currently turned off by the user. It describes what will happen when price tracking is initiated.">
-      Track prices across multiple sites
+      View price drops in the side panel
     </message>
+
 
     <message name="IDS_BOOKMARKS_MANAGER_TRACKED_PRODUCTS" desc="Text shown for a product-specific bookmarks folder in the bookmarks manager. User can click this item to view their tracked product.">
       Tracked products
@@ -288,14 +289,14 @@
     <message name="IDS_PRICE_HISTORY_SINGLE_OPTION_TYPICAL_PRICE" desc="Text shown in the Price History section in the Shopping Insights side panel, indicating this option's price is typical. This string is used when we only find one buying option on the page.">
       This price is typical
     </message>
-    <message name="IDS_SHOPPING_INSIGHTS_SIDE_PANEL_TRACK_PRICE_DESCRIPTION" desc="The description of the Price Tracking section in the Shopping Insights side panel.">
-      You'll get email alerts if the price drops on any site.
+    <message name="IDS_SHOPPING_INSIGHTS_SIDE_PANEL_TRACK_PRICE_DESCRIPTION" desc="The description of the Price Tracking section in the Shopping Insights side panel. Please ignore the period in the end of the sentence in the screenshot and don't put period in the final translation, as the period is handled separately in code.">
+      You'll get email alerts if the price drops on any site
     </message>
-    <message name="IDS_SHOPPING_INSIGHTS_SIDE_PANEL_TRACK_PRICE_DONE" desc="The description of the Price Tracking section in the Shopping Insights side panel when a user successfully tracks the product displayed on the current web page. It indicates this product is currently being tracked and which bookmarks folder it is saved.">
-      You’re tracking this product. This page is saved in <ph name="LAST_BOOKMARKS_FOLDER">$1<ex>Other Bookmarks</ex></ph>.
+    <message name="IDS_SHOPPING_INSIGHTS_SIDE_PANEL_TRACK_PRICE_DONE" desc="The description of the Price Tracking section in the Shopping Insights side panel when a user successfully tracks the product displayed on the current web page. It indicates this product is currently being tracked and which bookmarks folder it is saved. Please ignore the period in the end of the sentence in the screenshot and don't put period in the final translation, as the period is handled separately in code.">
+      You’re tracking this product. This page is saved in <ph name="LAST_BOOKMARKS_FOLDER">$1<ex>Other Bookmarks</ex></ph>
     </message>
-    <message name="IDS_SHOPPING_INSIGHTS_SIDE_PANEL_TRACK_PRICE_ERROR" desc="The description of the Price Tracking section in the Shopping Insights side panel when a user failed to track the product displayed on the current web page.">
-      Something went wrong. Your change wasn't saved.
+    <message name="IDS_SHOPPING_INSIGHTS_SIDE_PANEL_TRACK_PRICE_ERROR" desc="The description of the Price Tracking section in the Shopping Insights side panel when a user failed to track the product displayed on the current web page. Please ignore the period in the end of the sentence in the screenshot and don't put period in the final translation, as the period is handled separately in code.">
+      Something went wrong. Your change wasn't saved
     </message>
   </if>
 
